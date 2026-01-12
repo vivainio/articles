@@ -4,6 +4,10 @@ Tmux is a terminal multiplexer that lets you run multiple terminal sessions insi
 
 This tutorial is based on my custom [tmux.conf](https://github.com/vivainio/dotfiles/blob/master/tmux.conf).
 
+## Why Tmux?
+
+Tmux makes it easy to multitask across many projects in different sessions, with one or more Claude Code instances running in each session.
+
 ## Custom Prefix
 
 The default tmux prefix `Ctrl+b` is replaced with `Ctrl+Space`. This is more ergonomic and allows you to execute all chords quickly. Combined with Alt+arrow navigation, everything becomes even easier.
