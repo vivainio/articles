@@ -59,3 +59,9 @@ Panes let you split a tab into multiple views.
 ## Level 4: Extensibility
 
 Tmux is highly scriptable. My config adds `Prefix + Ctrl+G` which pops up lazygit in a floating window for easy review of current changes in the tab's working directory. The popup appears over your current work and closes when you're done.
+
+## Q&A
+
+**Why not Zellij?**
+
+Tmux is more mature and a much smaller application.
