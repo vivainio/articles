@@ -6,7 +6,7 @@ This tutorial is based on my custom [tmux.conf](https://github.com/vivainio/dotf
 
 ## Custom Prefix
 
-The default tmux prefix `Ctrl+b` is replaced with `Ctrl+Space` for easier access.
+The default tmux prefix `Ctrl+b` is replaced with `Ctrl+Space`. This is more ergonomic and allows you to execute all chords quickly. Combined with Alt+arrow navigation, everything becomes even easier.
 
 ## Level 1: Tabs
 
