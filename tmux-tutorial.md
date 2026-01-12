@@ -64,4 +64,4 @@ Tmux is highly scriptable. My config adds `Prefix + Ctrl+G` which pops up lazygi
 
 **Why not Zellij?**
 
-Tmux is more mature and a much smaller application.
+Tmux is more mature and a much smaller application. It's not written in Rust (yet), but it does everything it needs to do and can be extended to the rest.
