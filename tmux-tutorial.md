@@ -12,7 +12,7 @@ Tmux allows you to detach from sessions and reattach later, which is useful for 
 
 The default tmux prefix `Ctrl+b` is replaced with `Ctrl+Space` for easier access.
 
-## Basic Tab Usage
+## Level 1: Tabs
 
 Tmux calls tabs "windows". Here's the essentials:
 
@@ -24,6 +24,20 @@ Tmux calls tabs "windows". Here's the essentials:
 | Previous tab | `Alt+Left` |
 
 No prefix needed for navigation - just hold Alt and press arrow keys.
+
+## Level 2: Sessions
+
+Sessions let you group tabs for different projects. Switch between entire sessions instantly.
+
+| Action | Binding |
+|--------|---------|
+| New session | `tmux new -s name` |
+| Next session | `Alt+Down` |
+| Previous session | `Alt+Up` |
+| List sessions | `Prefix + s` |
+| Detach | `Prefix + d` |
+
+Workflow: one session per project. Alt+Up/Down to jump between projects.
 
 ## All Key Bindings
 
