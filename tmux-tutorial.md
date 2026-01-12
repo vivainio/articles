@@ -52,19 +52,3 @@ All new tabs in a session start in the same directory where you created the sess
 | `Alt+Left/Right` | Switch windows |
 | `Alt+Up/Down` | Switch sessions |
 
-## Configuration Highlights
-
-- **Mouse support** enabled
-- **History limit** set to 50,000 lines
-- **Windows and panes start at 1** (not 0)
-- **Auto-renumber windows** when one is closed
-- **Status bar at top** with Catppuccin-inspired colors
-- **Default shell** is Nushell
-
-## Basic Commands
-
-```bash
-tmux new -s mysession    # Create named session
-tmux attach -t mysession # Attach to session
-tmux ls                  # List sessions
-```
