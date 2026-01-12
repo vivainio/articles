@@ -38,3 +38,14 @@ Sessions let you group tabs for different projects. Switch between entire sessio
 | Detach | `Prefix + d` |
 
 All new tabs in a session start in the same directory where you created the session. This makes sessions ideal for grouping related work - one session per project, and every tab opens ready to go in that project's folder.
+
+## Level 3: Panes
+
+Panes let you split a tab into multiple views.
+
+| Action | Binding |
+|--------|---------|
+| Split vertically | `Prefix + %` |
+| Split horizontally | `Prefix + "` |
+| Kill pane | `Prefix + x` |
+| Switch pane | `Prefix + arrow keys` |
