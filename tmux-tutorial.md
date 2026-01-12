@@ -38,17 +38,3 @@ Sessions let you group tabs for different projects. Switch between entire sessio
 | Detach | `Prefix + d` |
 
 All new tabs in a session start in the same directory where you created the session. This makes sessions ideal for grouping related work - one session per project, and every tab opens ready to go in that project's folder.
-
-## All Key Bindings
-
-| Binding | Action |
-|---------|--------|
-| `Ctrl+Space` | Prefix key |
-| `Prefix + c` | New window |
-| `Prefix + k` | Kill window |
-| `Prefix + x` | Kill pane (no prompt) |
-| `Prefix + R` | Reload config |
-| `Prefix + Ctrl+G` | Open lazygit in popup |
-| `Alt+Left/Right` | Switch windows |
-| `Alt+Up/Down` | Switch sessions |
-
