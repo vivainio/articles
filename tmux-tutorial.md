@@ -12,14 +12,28 @@ Tmux allows you to detach from sessions and reattach later, which is useful for 
 
 The default tmux prefix `Ctrl+b` is replaced with `Ctrl+Space` for easier access.
 
-## Key Bindings
+## Basic Tab Usage
+
+Tmux calls tabs "windows". Here's the essentials:
+
+| Action | Binding |
+|--------|---------|
+| Create new tab | `Prefix + c` |
+| Kill current tab | `Prefix + k` |
+| Next tab | `Alt+Right` |
+| Previous tab | `Alt+Left` |
+
+No prefix needed for navigation - just hold Alt and press arrow keys.
+
+## All Key Bindings
 
 | Binding | Action |
 |---------|--------|
 | `Ctrl+Space` | Prefix key |
-| `Prefix + R` | Reload config |
+| `Prefix + c` | New window |
 | `Prefix + k` | Kill window |
 | `Prefix + x` | Kill pane (no prompt) |
+| `Prefix + R` | Reload config |
 | `Prefix + Ctrl+G` | Open lazygit in popup |
 | `Alt+Left/Right` | Switch windows |
 | `Alt+Up/Down` | Switch sessions |
