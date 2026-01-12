@@ -25,6 +25,8 @@ Tmux calls tabs "windows". Here's the essentials:
 
 No prefix needed for navigation - just hold Alt and press arrow keys.
 
+Modern shells and Claude Code change the tab title based on what's happening in the window. Normally this would go to the terminal window title, but tmux captures it and renders it as the tab title within the window.
+
 ## Level 2: Sessions
 
 Sessions let you group tabs for different projects. Switch between entire sessions instantly.
