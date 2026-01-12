@@ -43,6 +43,8 @@ All new tabs in a session start in the same directory where you created the sess
 
 `Prefix + w` shows you all sessions and tabs within each session, with a preview of the tab content. This makes it easy to peek at ongoing work and jump back to it.
 
+`Prefix + d` detaches from tmux, leaving all sessions running in the background. Reattach with `tmux a`, or start a new session with `tmux new -s name`.
+
 ## Level 3: Panes
 
 Panes let you split a tab into multiple views.
