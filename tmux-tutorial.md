@@ -2,7 +2,7 @@
 
 Tmux is a terminal multiplexer that lets you run multiple terminal sessions inside a single window.
 
-This tutorial is based on my custom [tmux.conf](https://github.com/vivainio/dotfiles/blob/master/tmux.conf). It makes tmux more ergonomic and significantly prettier, without bloated plugins.
+This tutorial is based on my custom [tmux.conf](https://github.com/vivainio/dotfiles/blob/master/tmux.conf). It makes tmux more ergonomic and significantly prettier, without bloated plugins. It may not be the best conf, but it's mine.
 
 ## Why Tmux?
 
