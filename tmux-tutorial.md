@@ -37,7 +37,7 @@ Sessions let you group tabs for different projects. Switch between entire sessio
 | List sessions | `Prefix + w` |
 | Detach | `Prefix + d` |
 
-Workflow: one session per project. Alt+Up/Down to jump between projects.
+All new tabs in a session start in the same directory where you created the session. This makes sessions ideal for grouping related work - one session per project, and every tab opens ready to go in that project's folder.
 
 ## All Key Bindings
 
