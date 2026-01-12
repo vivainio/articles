@@ -39,6 +39,8 @@ Sessions let you group tabs for different projects. Switch between entire sessio
 
 All new tabs in a session start in the same directory where you created the session. This makes sessions ideal for grouping related work - one session per project, and every tab opens ready to go in that project's folder.
 
+`Prefix + w` shows you all sessions and tabs within each session, with a preview of the tab content. This makes it easy to peek at ongoing work and jump back to it.
+
 ## Level 3: Panes
 
 Panes let you split a tab into multiple views.
