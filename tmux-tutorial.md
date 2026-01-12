@@ -4,10 +4,6 @@ Tmux is a terminal multiplexer that lets you run multiple terminal sessions insi
 
 This tutorial is based on my custom [tmux.conf](https://github.com/vivainio/dotfiles/blob/master/tmux.conf).
 
-## Why Tmux?
-
-Tmux allows you to detach from sessions and reattach later, which is useful for long-running processes and remote work.
-
 ## Custom Prefix
 
 The default tmux prefix `Ctrl+b` is replaced with `Ctrl+Space` for easier access.
