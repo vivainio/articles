@@ -65,3 +65,7 @@ Tmux is highly scriptable. My config adds `Prefix + Ctrl+G` which pops up lazygi
 **Why not Zellij?**
 
 Tmux is more mature and a much smaller application. It's not written in Rust (yet), but it does everything it needs to do and can be extended to the rest.
+
+**Seriously, why??**
+
+With the advent of AI, there is growing ability to multitask. Multitasking is made much easier if you have full sessions that contain the context for one task, and can easily hop to other sessions with next steps waiting for you. In IDEs it's easy to get lost among windows and blinking lights, while terminal sessions stay very focused on an individual task.
