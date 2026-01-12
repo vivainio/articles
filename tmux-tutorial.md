@@ -34,7 +34,7 @@ Sessions let you group tabs for different projects. Switch between entire sessio
 | New session | `tmux new -s name` |
 | Next session | `Alt+Down` |
 | Previous session | `Alt+Up` |
-| List sessions | `Prefix + s` |
+| List sessions | `Prefix + w` |
 | Detach | `Prefix + d` |
 
 Workflow: one session per project. Alt+Up/Down to jump between projects.
