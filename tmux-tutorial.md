@@ -20,6 +20,7 @@ Tmux calls tabs "windows". Here's the essentials:
 |--------|---------|
 | Create new tab | `Prefix + c` |
 | Kill current tab | `Prefix + k` |
+| Close other tabs | `Prefix + o` |
 | Next tab | `Alt+Right` |
 | Previous tab | `Alt+Left` |
 
