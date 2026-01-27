@@ -57,6 +57,18 @@ Panes let you split a tab into multiple views.
 | Kill pane | `Prefix + x` |
 | Switch pane | `Prefix + arrow keys` |
 
+## Tip: Copy Mode
+
+Need to scroll up or copy text? Enter copy mode with `Prefix + Enter`. Uses vim keys:
+
+| Action | Key |
+|--------|-----|
+| Navigate | `h/j/k/l` |
+| Start selection | `v` |
+| Copy | `y` |
+| Paste | `Prefix + ]` |
+| Exit | `q` |
+
 ## Level 4: Extensibility
 
 Tmux is highly scriptable. My config adds `Prefix + Ctrl+G` which pops up lazygit in a floating window for easy review of current changes in the tab's working directory. The popup appears over your current work and closes when you're done.
