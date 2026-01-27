@@ -64,9 +64,9 @@ Need to scroll up or copy text? Enter copy mode with `Prefix + Enter`. Uses vim 
 | Action | Key |
 |--------|-----|
 | Navigate | `h/j/k/l` |
-| Start selection | `v` |
-| Copy | `y` |
-| Paste | `Prefix + ]` |
+| Start selection | `Space` |
+| Copy | `Enter` |
+| Paste | `Ctrl+v` |
 | Exit | `q` |
 
 ## Level 4: Extensibility
