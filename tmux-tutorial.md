@@ -57,13 +57,14 @@ Panes let you split a tab into multiple views.
 | Kill pane | `Prefix + x` |
 | Switch pane | `Prefix + arrow keys` |
 
-## Tip: Copy Mode
+## Copy Mode
 
-Need to scroll up or copy text? Enter copy mode with `Prefix + Enter`. Uses vim keys:
+Scrolling up with the mouse wheel enters copy mode automatically - this can catch you off guard, so just press `q` to exit back to normal mode and scroll back to the bottom, ready to continue typing. You can also enter copy mode explicitly with `Prefix + Enter`.
 
 | Action | Key |
 |--------|-----|
-| Navigate | `h/j/k/l` |
+| Navigate | arrow keys |
+| Search | `/` (forward), `?` (backward), `n`/`N` to jump between matches |
 | Start selection | `Space` |
 | Copy | `Enter` |
 | Paste | `Ctrl+v` |
