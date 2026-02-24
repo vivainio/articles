@@ -57,7 +57,7 @@ Panes let you split a tab into multiple views.
 | Kill pane | `Prefix + x` |
 | Switch pane | `Prefix + arrow keys` |
 
-## Copy Mode
+## Level 4: Copy Mode
 
 Scrolling up with the mouse wheel enters copy mode automatically - this can catch you off guard, so just press `q` to exit back to normal mode and scroll back to the bottom, ready to continue typing. You can also enter copy mode explicitly with `Prefix + Enter`.
 
@@ -70,9 +70,17 @@ Scrolling up with the mouse wheel enters copy mode automatically - this can catc
 | Paste | `Ctrl+v` |
 | Exit | `q` |
 
-## Level 4: Extensibility
+## Level 5: Extensibility
 
-Tmux is highly scriptable. My config adds `Prefix + Ctrl+G` which pops up lazygit in a floating window for easy review of current changes in the tab's working directory. The popup appears over your current work and closes when you're done.
+Tmux is highly scriptable. My config uses `display-popup` to launch apps in floating windows that appear over your current work and close when you're done:
+
+| Popup | Binding |
+|-------|---------|
+| [lazygit](https://github.com/jesseduffield/lazygit) | `Prefix + Ctrl+G` |
+| [lf](https://github.com/gokcehan/lf) file manager | `Prefix + Ctrl+L` |
+| Daily notes editor | `Prefix + N` |
+
+Lazygit is launched with `--screen-mode half` for comfortable diff viewing, and opens in the tab's working directory.
 
 ## Q&A
 
