@@ -65,7 +65,7 @@ This makes it easy to peek at ongoing work and jump back to it. Type `/` to sear
 
 ## Level 3: Panes
 
-Panes let you split a tab into multiple views.
+Panes let you split a tab into multiple views. I'll admit I don't use panes as much as I should - I tend to reach for new tabs instead. But they're useful when you want to see two things side by side.
 
 | Action | Binding |
 |--------|---------|
