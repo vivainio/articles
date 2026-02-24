@@ -1,5 +1,7 @@
 # My Vibing Flow
 
+*2026-02-24*
+
 This is how I use Claude Code in WSL to get things done.
 
 ## Tmux First
