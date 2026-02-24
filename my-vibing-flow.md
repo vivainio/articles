@@ -16,8 +16,8 @@ I `cd` to the directory I want to work on (in practice, I use [Zoxide](https://g
 
 From there, I open new tabs to run commands in the project directory. For quick access to common tools, I use tmux popup shortcuts:
 
-- `Prefix + Ctrl+G` - lazygit to review diffs
-- `Prefix + Ctrl+L` - lf file manager to browse files
+- `Prefix + Ctrl+G` - [lazygit](https://github.com/jesseduffield/lazygit) to review diffs
+- `Prefix + Ctrl+L` - [lf](https://github.com/gokcehan/lf) file manager to browse files
 
 These float over the current tab and disappear when done. See [my tmux tutorial](tmux-tutorial.md) for the full setup.
 
