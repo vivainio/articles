@@ -95,7 +95,7 @@ Tmux is highly scriptable. My config uses `display-popup` to launch apps in floa
 |-------|---------|
 | [lazygit](https://github.com/jesseduffield/lazygit) | `Prefix + Ctrl+G` |
 | [lf](https://github.com/gokcehan/lf) file manager | `Prefix + Ctrl+L` |
-| Daily notes editor | `Prefix + N` |
+| Daily notes editor | `Prefix + Ctrl+N` |
 
 Lazygit is launched with `--screen-mode half` for comfortable diff viewing, and opens in the tab's working directory.
 
