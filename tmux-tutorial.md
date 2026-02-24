@@ -42,7 +42,21 @@ Sessions let you group tabs for different projects. Switch between entire sessio
 
 All new tabs in a session start in the same directory where you created the session. This makes sessions ideal for grouping related work - one session per project, and every tab opens ready to go in that project's folder.
 
-`Prefix + w` shows you all sessions and tabs within each session, with a preview of the tab content. This makes it easy to peek at ongoing work and jump back to it.
+`Prefix + w` opens the tree view, showing all sessions, tabs, and panes with a preview of each:
+
+```
+  backend
+  ├─ 1: claude
+  ├─ 2: server
+  └─ 3: tests
+  frontend
+  ├─ 1: claude
+  └─ 2: dev
+  notes
+  └─ 1: claude
+```
+
+This makes it easy to peek at ongoing work and jump back to it. Type `/` to search within the tree by name.
 
 `Prefix + d` detaches from tmux, leaving all sessions running in the background. Reattach with `tmux a`, or start a new session with `tmux new -s name`.
 
