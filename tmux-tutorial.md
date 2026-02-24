@@ -38,6 +38,7 @@ Sessions let you group tabs for different projects. Switch between entire sessio
 | Next session | `Alt+Down` |
 | Previous session | `Alt+Up` |
 | List sessions | `Prefix + w` |
+| Kill session | `Prefix + K` |
 | Detach | `Prefix + d` |
 
 All new tabs in a session start in the same directory where you created the session. This makes sessions ideal for grouping related work - one session per project, and every tab opens ready to go in that project's folder.
