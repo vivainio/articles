@@ -484,6 +484,14 @@ Every service imports the same file. Account numbers never change, but
 `constants.accounts.prod` is easier to review in a PR than a bare
 12-digit number — and you can't typo it.
 
+Unlike CDK, the abstraction can never get in the way. In CDK, when a construct
+doesn't expose the property you need, you're stuck — you have to use escape
+hatches, cast to `CfnResource`, or fight the type system. In Jsonnet, every
+helper returns a plain object. If a helper doesn't do what you need, you merge
+in a raw CloudFormation block with `+` right next to it — no escape hatch, no
+special API, just data. High-level helpers and low-level resources coexist in
+the same file, in the same `Resources:` object, with the same merge operator.
+
 ## Replacing SAM with sam.libsonnet
 
 If you're already using SAM templates (or thinking in SAM terms), there's a
