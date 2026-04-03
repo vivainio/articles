@@ -58,6 +58,16 @@ build a library of helpers that generate CloudFormation resources. The binary
 is a single ~2MB executable with no runtime dependencies. Compilation is
 instant.
 
+Jsonnet gives you the same power of abstraction as CDK — functions, local
+variables, imports, conditionals, array comprehensions, object merging — but
+everything stays declarative. There is no imperative runtime, no constructors
+building a resource graph in memory. You define data, not procedures. The
+output of a Jsonnet file *is* the template, not a side effect of running a
+program. And unlike CDK, there is no `node_modules` directory, no transitive
+dependency tree, and no 20-60 second `cdk synth` step. The Jsonnet binary is a
+single ~2 MB executable with zero runtime dependencies, and it compiles
+templates in milliseconds — fast enough that you never notice it.
+
 The approach: write a Jsonnet library where each helper returns a flat object
 of CloudFormation resources. Merge them with `+`. Run `jsonnet` to emit plain
 JSON. Deploy with `aws cloudformation deploy`. No framework, no transform, no
