@@ -362,6 +362,22 @@ local standardTags(service, stage) = {
 lambdaFn(logicalName, functionName, handler, ..., tags=standardTags(service, stage))
 ```
 
+Another example: CloudFormation intrinsic functions like `Fn::GetAtt` and
+`Fn::Sub` are verbose when written inline. The library provides shorthands:
+
+```jsonnet
+// These one-liners in cfn.libsonnet:
+getAtt(logical, attr):: { 'Fn::GetAtt': [logical, attr] },
+sub(str):: { 'Fn::Sub': str },
+ref(logical):: { Ref: logical },
+
+// Turn this:
+Resource: [{ 'Fn::GetAtt': ['OrderQueue', 'Arn'] }],
+
+// Into this:
+Resource: [cfn.getAtt('OrderQueue', 'Arn')],
+```
+
 You can also write functions that compose multiple helpers into a
 higher-level unit — a "microservice" function that bundles a Lambda, its
 log group, an alarm, and a dashboard widget into a single call. The difference

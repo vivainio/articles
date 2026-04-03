@@ -15,6 +15,11 @@
 //   }
 
 {
+  // ── Intrinsic function shorthands ─────────────────────────────────────────
+  getAtt(logical, attr):: { 'Fn::GetAtt': [logical, attr] },
+  sub(str):: { 'Fn::Sub': str },
+  ref(logical):: { Ref: logical },
+
   // ── Tags ───────────────────────────────────────────────────────────────────
   // Convert { Key: Value } object to CFN Tags array format.
   tags(obj):: [{ Key: k, Value: obj[k] } for k in std.objectFields(obj)],
