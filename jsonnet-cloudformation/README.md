@@ -455,6 +455,34 @@ just another object merged in. This is the same pattern CDK teams achieve with
 custom constructs, but the abstraction is a pure data transformation: you can
 print the output, diff it, and reason about it without running anything.
 
+A simpler but equally useful pattern is a shared constants file — mapping
+human-readable names to AWS account numbers, region codes, and other
+magic strings that would otherwise be scattered across templates:
+
+```jsonnet
+// lib/constants.libsonnet
+{
+  regions: {
+    dub: 'eu-west-1',
+    fra: 'eu-central-1',
+    iad: 'us-east-1',
+    pdx: 'us-west-2',
+  },
+  accounts: {
+    dev:     '111111111111',
+    staging: '222222222222',
+    prod:    '333333333333',
+  },
+  firehose: {
+    logArn: 'arn:aws:firehose:eu-west-1:111111111111:deliverystream/central-logs',
+    roleArn: 'arn:aws:iam::111111111111:role/firehose-log-role',
+  },
+}
+```
+
+Every service imports the same file, and when an account number or ARN changes,
+you update it in one place.
+
 ## Replacing SAM with sam.libsonnet
 
 If you're already using SAM templates (or thinking in SAM terms), there's a
