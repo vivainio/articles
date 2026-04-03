@@ -55,7 +55,9 @@ infrastructure in Python or C#, CDK's core runs on Node.js — you still need a
 Node runtime, `node_modules`, and the full tree of npm dependencies in every
 project and CI pipeline. `cdk synth` runs your code through jsii (the
 cross-language bridge) and Node to emit CloudFormation JSON — on a cold
-`node_modules` this takes 20-60 seconds even for small stacks. CI pipelines
+`node_modules` this takes 20-60 seconds even for small stacks. If you use
+TypeScript (the most common CDK language), add the compilation step on top —
+`tsc` or `ts-node` adds its own startup overhead to every synth. CI pipelines
 need a Node runtime image, `npx cdk` bootstrapping, and CDK-specific IAM
 permissions. For teams whose Lambda functions are Python or C#, maintaining a
 Node toolchain (plus the Python/C# toolchain you actually chose) solely for
