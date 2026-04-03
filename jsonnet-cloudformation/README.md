@@ -38,7 +38,7 @@ project and CI pipeline. `cdk synth` runs your code through jsii (the
 cross-language bridge) and Node to emit CloudFormation JSON — on a cold
 `node_modules` this takes 20-60 seconds even for small stacks. CI pipelines
 need a Node runtime image, `npx cdk` bootstrapping, and CDK-specific IAM
-permissions. For teams whose Lambda functions are Python or Go, maintaining a
+permissions. For teams whose Lambda functions are Python or C#, maintaining a
 Node toolchain (plus the Python/C# toolchain you actually chose) solely for
 the deployment layer is overhead that never pays for itself. CDK also
 generates CloudFormation with machine-generated logical IDs (hashes), making
