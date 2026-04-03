@@ -15,9 +15,9 @@ If you have dozens of services in production, this means either paying per seat
 for a build tool that wraps CloudFormation, or migrating. Most teams start
 evaluating alternatives at this point.
 
-### The usual alternatives
+### Why not SAM?
 
-**AWS SAM** is the natural first stop. It's AWS-native, open source, and
+AWS SAM is the natural first stop. It's AWS-native, open source, and
 `AWS::Serverless::Function` is a clean abstraction. But SAM only provides a
 handful of built-in resource types (`Function`, `Api`, `HttpApi`,
 `SimpleTable`, and a few others). The moment you need something outside that
@@ -31,7 +31,9 @@ can run `sam build` to preview the expansion, but the authoritative template —
 the one CloudFormation actually acts on — is generated server-side. You traded
 one black box for another.
 
-**AWS CDK** is popular but carries real costs. Even if you write your
+### Why not CDK?
+
+AWS CDK is popular but carries real costs. Even if you write your
 infrastructure in Python or C#, CDK's core runs on Node.js — you still need a
 Node runtime, `node_modules`, and the full tree of npm dependencies in every
 project and CI pipeline. `cdk synth` runs your code through jsii (the
@@ -51,7 +53,9 @@ you have large, complex infrastructure with dozens of interdependent resources
 — but for typical serverless stacks (a few Lambdas, an API Gateway, some
 queues), it's overkill.
 
-**Terraform** is a legitimate option but means adopting an entirely new state
+### Why not Terraform?
+
+Terraform is a legitimate option but means adopting an entirely new state
 management model, HCL syntax, and provider versioning. Terraform also [switched
 to the Business Source
 License](https://www.hashicorp.com/en/blog/hashicorp-adopts-business-source-license)
