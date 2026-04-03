@@ -81,7 +81,13 @@ JSON template to CloudFormation, and that template is still sitting in your
 deployment bucket or in the CloudFormation console under the stack's Template
 tab.
 
-The migration is mechanical:
+The migration is mechanical — and mechanical work is exactly what AI coding
+agents excel at. A tool like Claude Code can read your existing CloudFormation
+JSON, factor it into library calls, and verify the output matches the original.
+This repository includes a sample Claude Code skill for this workflow:
+[`skills/exit-serverless-to-jsonnet/SKILL.md`](skills/exit-serverless-to-jsonnet/SKILL.md).
+
+The steps:
 
 1. **Capture** the current generated CloudFormation JSON for each service
    (`sls package` writes it to `.serverless/cloudformation-template-update-stack.json`,
