@@ -31,28 +31,90 @@ local cfn = import 'cfn.libsonnet';
   // props is the AWS::Lambda::Function Properties object.
   // Required: FunctionName, Handler, Code, Role.
   // Defaults: Runtime python3.12, MemorySize 128, Timeout 300.
-  lambdaG(prefix, props)::
+  lambdaG(prefix, props):: $.lambda(prefix, props).resources,
+
+  // ── Lambda builder ─────────────────────────────────────────────────────
+  // Returns { resources, fn, logGroup, version, routes(apiLogical, routes) }.
+  // Use .resources to merge with +, .fn to reference the function logical ID.
+  //
+  //   local myApp = aws.lambda('MyApp', { FunctionName: '...', ... });
+  //   myApp.resources
+  //   + myApp.routes('MyApi', { Default: { routeKey: '$default' } })
+  lambda(prefix, props)::
     local functionName = props.FunctionName;
+    local fnLogical = prefix + 'Function';
     local defaults = {
       Runtime: 'python3.12',
       MemorySize: 128,
       Timeout: 300,
     };
     {
-      [prefix + 'LogGroup']: {
-        Type: 'AWS::Logs::LogGroup',
-        Properties: { LogGroupName: '/aws/lambda/' + functionName },
+      fn: fnLogical,
+      logGroup: prefix + 'LogGroup',
+      version: prefix + 'Version',
+
+      resources: {
+        [prefix + 'LogGroup']: {
+          Type: 'AWS::Logs::LogGroup',
+          Properties: { LogGroupName: '/aws/lambda/' + functionName },
+        },
+        [fnLogical]: {
+          Type: 'AWS::Lambda::Function',
+          Properties: defaults + props,
+          DependsOn: [prefix + 'LogGroup'],
+        },
+        [prefix + 'Version']: {
+          Type: 'AWS::Lambda::Version',
+          DeletionPolicy: 'Retain',
+          Properties: { FunctionName: { Ref: fnLogical } },
+        },
       },
-      [prefix + 'Function']: {
-        Type: 'AWS::Lambda::Function',
-        Properties: defaults + props,
-        DependsOn: [prefix + 'LogGroup'],
-      },
-      [prefix + 'Version']: {
-        Type: 'AWS::Lambda::Version',
-        DeletionPolicy: 'Retain',
-        Properties: { FunctionName: { Ref: prefix + 'Function' } },
-      },
+
+      // Generate HTTP API routes wired to this function.
+      // routeMap is { RouteName: { routeKey: '...', authorizerId?: ... } }
+      routes(apiLogical, routeMap)::
+        local routeNames = std.objectFields(routeMap);
+        // One integration shared by all routes on this API
+        local integLogical = prefix + apiLogical + 'Integration';
+        { [integLogical]: {
+          Type: 'AWS::ApiGatewayV2::Integration',
+          Properties: {
+            ApiId: cfn.ref(apiLogical),
+            IntegrationType: 'AWS_PROXY',
+            IntegrationUri: cfn.getArn(fnLogical),
+            PayloadFormatVersion: '2.0',
+          },
+        } }
+        + std.foldl(
+          function(acc, name)
+            local r = routeMap[name];
+            acc + {
+              [prefix + name + 'Route']: {
+                Type: 'AWS::ApiGatewayV2::Route',
+                Properties: {
+                  ApiId: cfn.ref(apiLogical),
+                  RouteKey: r.routeKey,
+                  Target: cfn.sub('integrations/${' + integLogical + '}'),
+                }
+                + (if std.objectHas(r, 'authorizerId') && r.authorizerId != null then {
+                  AuthorizationType: 'JWT',
+                  AuthorizerId: r.authorizerId,
+                } else {}),
+              },
+            },
+          routeNames, {}
+        )
+        + {
+          [prefix + apiLogical + 'Permission']: {
+            Type: 'AWS::Lambda::Permission',
+            Properties: {
+              FunctionName: cfn.getArn(fnLogical),
+              Action: 'lambda:InvokeFunction',
+              Principal: 'apigateway.amazonaws.com',
+              SourceArn: cfn.sub('arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${' + apiLogical + '}/*'),
+            },
+          },
+        },
     },
 
 

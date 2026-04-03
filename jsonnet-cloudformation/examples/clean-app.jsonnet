@@ -14,6 +14,14 @@ local bucket = service + '-' + stage + '-data';
 local partner = cfn.ref('PartnerAccountId');
 local logDest = cfn.ref('LogDestinationArn');
 
+local myApp = aws.lambda('MyApp', {
+  FunctionName: service + '-' + stage + '-app',
+  Handler: 'app.handler',
+  Code: { S3Bucket: 'deploy-artifacts', S3Key: service + '/' + stage + '/package.zip' },
+  Role: cfn.getArn('MyAppRole'),
+  Environment: { Variables: { TABLE: table, BUCKET: bucket } },
+});
+
 {
   AWSTemplateFormatVersion: '2010-09-09',
 
@@ -25,23 +33,19 @@ local logDest = cfn.ref('LogDestinationArn');
   },
 
   Resources:
-    aws.lambdaG('App', {
-      FunctionName: service + '-' + stage + '-app',
-      Handler: 'app.handler',
-      Code: { S3Bucket: 'deploy-artifacts', S3Key: service + '/' + stage + '/package.zip' },
-      Role: cfn.getArn('AppRole'),
-      Environment: { Variables: { TABLE: table, BUCKET: bucket } },
-    })
+    myApp.resources
 
-    // HTTP API with JWT-protected proxy route
+    // HTTP API with JWT-protected catch-all + unauthenticated /login
     + aws.httpApiG('MyApi', service + '-' + stage)
     + { MyApiAuth: aws.jwtAuthorizer('MyApi', 'jwt', cfn.ref('JwtIssuer'), [cfn.ref('JwtAudience')]) }
-    + aws.httpApiRouteG('AppDefault', 'MyApi', 'AppFunction', '$default', authorizerId=cfn.ref('MyApiAuth'))
-    + aws.httpApiRouteG('AppLoginGet', 'MyApi', 'AppFunction', 'GET /login')
-    + aws.httpApiRouteG('AppLoginPost', 'MyApi', 'AppFunction', 'POST /login')
+    + myApp.routes('MyApi', {
+      Default: { routeKey: '$default', authorizerId: cfn.ref('MyApiAuth') },
+      LoginGet: { routeKey: 'GET /login' },
+      LoginPost: { routeKey: 'POST /login' },
+    })
 
     + {
-      AppRole: aws.lambdaRole(service + '-' + stage, [
+      MyAppRole: aws.lambdaRole(service + '-' + stage, [
         cfn.allow(actions.ddbAll, cfn.arn('dynamodb', 'table/' + table)),
         cfn.allow(actions.s3Read + actions.s3Write, 'arn:aws:s3:::' + bucket + '/*'),
         cfn.allow(actions.s3List, 'arn:aws:s3:::' + bucket),
@@ -52,11 +56,11 @@ local logDest = cfn.ref('LogDestinationArn');
       BucketNameParam: cfn.ssmOutput('/' + service + '/' + stage + '/bucket-name', cfn.ref('DataBucket')),
 
       // Forward Lambda logs to central logging
-      AppLogForward: aws.logSubscription('/aws/lambda/' + service + '-' + stage + '-app', logDest),
+      MyAppLogForward: aws.logSubscription('/aws/lambda/' + service + '-' + stage + '-app', logDest),
 
       // Cross-account role: partner can invoke Lambda and read bucket
       PartnerRole: aws.assumableRole([partner], [
-        cfn.allow(actions.lambdaInvoke, cfn.getArn('AppFunction')),
+        cfn.allow(actions.lambdaInvoke, cfn.getArn(myApp.fn)),
         cfn.allow(actions.s3Read, 'arn:aws:s3:::' + bucket + '/*'),
         cfn.allow(actions.s3List, 'arn:aws:s3:::' + bucket),
       ]),
@@ -64,7 +68,7 @@ local logDest = cfn.ref('LogDestinationArn');
 
   Outputs: {
     ApiEndpoint: cfn.output(cfn.sub('https://${MyApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}')),
-    FunctionArn: cfn.output(cfn.getArn('AppFunction')),
+    FunctionArn: cfn.output(cfn.getArn(myApp.fn)),
     TableName: cfn.output(cfn.ref('DataTable')),
     BucketName: cfn.output(cfn.ref('DataBucket')),
   },
