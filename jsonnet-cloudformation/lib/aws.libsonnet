@@ -128,6 +128,19 @@ local cfn = import 'cfn.libsonnet';
   },
 
 
+  // ── Log subscription filter ───────────────────────────────────────────
+  // Returns a single resource value. Forwards a log group to a destination
+  // (Splunk, Kinesis Firehose, another account's log group, etc.).
+  logSubscription(logGroupName, destinationArn):: {
+    Type: 'AWS::Logs::SubscriptionFilter',
+    Properties: {
+      LogGroupName: logGroupName,
+      DestinationArn: destinationArn,
+      FilterPattern: '',
+    },
+  },
+
+
   // ── Schedule event (G) ───────────────────────────────────────────────────
   // Expands to: {prefix}Rule + {prefix}Permission.
   scheduleG(prefix, functionLogical, schedule, enabled=true):: {
