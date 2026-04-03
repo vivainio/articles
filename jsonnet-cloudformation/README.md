@@ -31,14 +31,16 @@ can run `sam build` to preview the expansion, but the authoritative template —
 the one CloudFormation actually acts on — is generated server-side. You traded
 one black box for another.
 
-**AWS CDK** is popular but carries real costs. It requires a Node.js runtime
-and `npm install` for every project, pulling in hundreds of transitive
-dependencies. `cdk synth` runs your TypeScript/Python through a full
-compilation step to emit CloudFormation JSON — on a cold `node_modules` this
-takes 20-60 seconds even for small stacks. CI pipelines need a Node runtime
-image, `npx cdk` bootstrapping, and CDK-specific IAM permissions. For teams
-whose Lambda functions are Python or Go, maintaining a Node toolchain solely
-for the deployment layer is overhead that never pays for itself. CDK also
+**AWS CDK** is popular but carries real costs. Even if you write your
+infrastructure in Python or C#, CDK's core runs on Node.js — you still need a
+Node runtime, `node_modules`, and the full tree of npm dependencies in every
+project and CI pipeline. `cdk synth` runs your code through jsii (the
+cross-language bridge) and Node to emit CloudFormation JSON — on a cold
+`node_modules` this takes 20-60 seconds even for small stacks. CI pipelines
+need a Node runtime image, `npx cdk` bootstrapping, and CDK-specific IAM
+permissions. For teams whose Lambda functions are Python or Go, maintaining a
+Node toolchain (plus the Python/C# toolchain you actually chose) solely for
+the deployment layer is overhead that never pays for itself. CDK also
 generates CloudFormation with machine-generated logical IDs (hashes), making
 diffs and troubleshooting harder than hand-written templates.
 
