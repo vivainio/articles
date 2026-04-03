@@ -93,7 +93,7 @@ local tags = cfn.tags({
     ),
 
   Outputs: {
-    QueueUrl: { Value: cfn.ref('OrderQueue') },
-    DLQUrl:   { Value: cfn.ref('OrderDLQ') },
+    QueueUrl: cfn.output(cfn.ref('OrderQueue')),
+    DLQUrl:   cfn.output(cfn.ref('OrderDLQ')),
   },
 }

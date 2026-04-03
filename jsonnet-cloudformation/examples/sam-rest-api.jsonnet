@@ -90,8 +90,6 @@ local api = sam.Api('TodoApi', {
     + apiHandler.resources
     + api.resources,
   Outputs: {
-    Endpoint: {
-      Value: cfn.sub('https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/' + stage),
-    },
+    Endpoint: cfn.output(cfn.sub('https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/' + stage)),
   },
 }

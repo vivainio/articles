@@ -75,7 +75,7 @@ local processor = sam.Function('Processor', {
       tags=tags,
     ),
   Outputs: {
-    QueueUrl: { Value: cfn.ref('OrderQueue') },
-    DLQUrl:   { Value: cfn.ref('OrderDLQ') },
+    QueueUrl: cfn.output(cfn.ref('OrderQueue')),
+    DLQUrl:   cfn.output(cfn.ref('OrderDLQ')),
   },
 }

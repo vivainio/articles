@@ -49,6 +49,6 @@ local stage   = std.extVar('stage');
     + cfn.scheduleEvent('Worker', 'cron(0 3 * * ? *)', enabled=true),
 
   Outputs: {
-    WorkerFunctionArn: { Value: cfn.getAtt('WorkerLambdaFunction', 'Arn') },
+    WorkerFunctionArn: cfn.output(cfn.getAtt('WorkerLambdaFunction', 'Arn')),
   },
 }

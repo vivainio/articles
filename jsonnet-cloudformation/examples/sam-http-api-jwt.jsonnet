@@ -73,8 +73,6 @@ local httpApi = sam.HttpApi('UserHttpApi', {
     + apiHandler.resources
     + httpApi.resources,
   Outputs: {
-    Endpoint: {
-      Value: cfn.sub('https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'),
-    },
+    Endpoint: cfn.output(cfn.sub('https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}')),
   },
 }

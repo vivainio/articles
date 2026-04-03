@@ -20,6 +20,10 @@
   sub(str):: { 'Fn::Sub': str },
   ref(logical):: { Ref: logical },
 
+  // ── Output shorthands ──────────────────────────────────────────────────────
+  output(value):: { Value: value },
+  exportOutput(value, name):: { Value: value, Export: { Name: name } },
+
   // ── Tags ───────────────────────────────────────────────────────────────────
   // Convert { Key: Value } object to CFN Tags array format.
   tags(obj):: [{ Key: k, Value: obj[k] } for k in std.objectFields(obj)],

@@ -77,8 +77,6 @@ local authRef = cfn.ref(authorizerLogical);
     ]),
 
   Outputs: {
-    ApiEndpoint: {
-      Value: cfn.sub('https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'),
-    },
+    ApiEndpoint: cfn.output(cfn.sub('https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}')),
   },
 }

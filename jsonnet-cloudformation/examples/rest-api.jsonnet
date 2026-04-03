@@ -96,8 +96,6 @@ local methods = [
     + cfn.apiLambdaPermission('ApiLambdaPermissionApiGateway', fn),
 
   Outputs: {
-    ServiceEndpoint: {
-      Value: cfn.sub('https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/' + stage),
-    },
+    ServiceEndpoint: cfn.output(cfn.sub('https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/' + stage)),
   },
 }
