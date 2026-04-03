@@ -111,10 +111,10 @@ recovering alcoholic — the reasons will become clear once you visit.
 
 Jsonnet gives you the same power of abstraction as CDK — functions, local
 variables, imports, conditionals, array comprehensions, object merging — but
-everything stays declarative. There is no imperative runtime, no constructors
-building a resource graph in memory. You define data, not procedures. The
-output of a Jsonnet file *is* the template, not a side effect of running a
-program. And unlike CDK, there is no `node_modules` directory, no transitive
+everything stays declarative. Declarative here means: data goes in, JSON comes
+out, and nothing else happens. There are no side effects — no file writes, no
+network calls, no mutable state. You define data, not procedures. The output of
+a Jsonnet file *is* the template, not a side effect of running a program. And unlike CDK, there is no `node_modules` directory, no transitive
 dependency tree, and no 20-60 second `cdk synth` step. The Jsonnet binary is a
 single ~2 MB executable with zero runtime dependencies, and it compiles
 templates in milliseconds — fast enough that you never notice it.
