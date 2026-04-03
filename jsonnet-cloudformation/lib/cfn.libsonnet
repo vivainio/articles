@@ -13,6 +13,7 @@
   getAtt(logical, attr):: { 'Fn::GetAtt': [logical, attr] },
   getArn(logical):: { 'Fn::GetAtt': [logical, 'Arn'] },
   sub(str):: { 'Fn::Sub': str },
+  join(sep, parts):: { 'Fn::Join': [sep, parts] },
   ref(logical):: { Ref: logical },
 
   // ── ARN builder ────────────────────────────────────────────────────────────

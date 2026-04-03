@@ -2,7 +2,7 @@
 
 ## Contents
 
-- [Why leave](#why-leave) — SAM, CDK, Terraform, and what we actually need
+- [Why leave](#why-leave) — SAM, CDK, and what we actually need
 - [The migration path](#the-migration-path) — how to port existing stacks
 - [The boilerplate problem](#the-boilerplate-problem) — what SLS/SAM hide from you
 - [The Jsonnet approach](#the-jsonnet-approach) — what the replacement looks like
@@ -13,6 +13,7 @@
 - [Comparison](#comparison) — source lines, output transparency, build deps
 - [How it works](#how-it-works) — object merging and custom abstractions
 - [Replacing SAM with sam.libsonnet](#replacing-sam-with-samlibsonnet) — SAM-shaped input, plain CFN output
+- [Beyond serverless](#beyond-serverless--greenfield-cloudformation) — resource factories, policy libraries, config-driven stacks
 - [Trade-offs](#trade-offs) — what you gain and lose
 - [Getting started](#getting-started)
 - [Caveats](#caveats) — key ordering, maturity, AI authorship
@@ -72,16 +73,6 @@ and careful ordering — one mistake and you lose data.
 
 CDK shines when you're building from scratch with large, complex infrastructure
 — but for migrating existing serverless stacks, it's the wrong tool.
-
-### Why not Terraform?
-
-Terraform is a legitimate option but means adopting an entirely new state
-management model, HCL syntax, and provider versioning. Terraform also [switched
-to the Business Source
-License](https://www.hashicorp.com/en/blog/hashicorp-adopts-business-source-license)
-in 2023, so you'd be trading one licensing problem for another. If your
-infrastructure is already CloudFormation, switching to Terraform is a bigger
-migration than the problem you're solving.
 
 ### What we actually need
 
@@ -304,6 +295,16 @@ role + cross-account invoker role + log forwarding to Kinesis + SSM parameter
 exports. Every resource name is explicit and visible in the source.
 
 → [`examples/clean-app.jsonnet`](examples/clean-app.jsonnet)
+
+### 7. Internal ALB with target-group factory (231 lines → 18 resources)
+
+Three node types (AppServer, JobRunner, Gateway) each need an internal ALB
+with 1–4 target groups. A `tgPair()` factory produces a matching TargetGroup +
+Listener per port, and `internalAlb()` assembles the full ALB + security group +
+N pairs from a compact config. Optional S3 access-log attributes, HTTPS
+certificate wiring, and a `tgArns` handle for plugging into ASGs.
+
+→ [`examples/load-balancer.jsonnet`](examples/load-balancer.jsonnet)
 
 ## Multi-stage from a single file
 
@@ -653,6 +654,92 @@ For new projects, start with `cfn` + `aws`. For migrating existing Serverless
 Framework stacks, use `cfn` + `sls` (or `sam`) to preserve logical IDs.
 All produce the same plain CloudFormation JSON.
 
+## Beyond serverless — greenfield CloudFormation
+
+This article started as an SLS migration guide, but the same approach works
+for any CloudFormation stack. The `cfn.libsonnet` and `aws.libsonnet` libraries
+have no Serverless Framework conventions — they're general-purpose helpers for
+writing CloudFormation as Jsonnet. Once you have functions, imports, and object
+merging, the patterns that emerge go well beyond Lambda and API Gateway.
+
+### Resource factories
+
+The most common pattern: a function that takes a config object and returns a
+bundle of related resources. The caller gets back a handle with `Ref`s and
+`GetAtt`s for wiring into other resources.
+
+- **Internal ALB** — `internalAlb()` produces ALB + security group + N
+  target-group/listener pairs from a port list. Three node types with different
+  port configurations use the same factory.
+  → [`load-balancer.jsonnet`](examples/load-balancer.jsonnet) (231 lines → 18 resources)
+
+- **Static site** — `staticSite()` produces S3 bucket + OAC + CloudFront
+  distribution + CloudFront Function + bucket policy. An array of site configs
+  is iterated with `std.foldl` to merge all resources.
+  → [`static-site.jsonnet`](examples/static-site.jsonnet) (289 lines → 15 resources)
+
+- **Queue with DLQ** — `queueWithDlq()` creates an SQS queue + dead-letter
+  queue pair with consistent naming and redrive policy.
+  → [`sample-patterns.jsonnet`](examples/sample-patterns.jsonnet) (278 lines → 23 resources)
+
+### IAM policy libraries
+
+IAM policies are the worst offender for copy-paste in CloudFormation. The same
+`kms:Decrypt` + `kms:GenerateDataKey` block shows up on every role that touches
+an encrypted resource, differing only in the key ARN. A policy library turns
+these into composable functions:
+
+```jsonnet
+local workerStatements =
+  policies.ddbWrite(tableName)
+  + policies.s3ReadWrite(bucketName)
+  + policies.kmsViaService('s3')
+  + policies.sqsConsume(inboundQueue.queueArn)
+  + policies.ssmRead('/' + service + '/' + stage + '/*');
+```
+
+Each function returns an array of IAM policy statements. Compose them with `+`
+and pass the result to a role builder. See the policy library and ECR
+repository factory in
+[`sample-patterns.jsonnet`](examples/sample-patterns.jsonnet).
+
+### Config-driven encryption
+
+KMS keys with service-specific grants follow a rigid structure — the key
+resource, an alias, and a grant policy that varies by consumer. A factory
+function parameterized by service name and principal ARNs eliminates the
+repetition.
+→ [`kms-keys.jsonnet`](examples/kms-keys.jsonnet) (152 lines → 12 resources)
+
+### Deny-all-except bucket policies
+
+A locked-down S3 bucket that denies all access except from a whitelist of IAM
+roles is a common compliance pattern. The interesting part is generating the
+`StringNotLike` condition from an array of role ARNs.
+→ [`protected-bucket.jsonnet`](examples/protected-bucket.jsonnet) (191 lines → 6 resources)
+
+### Step Functions
+
+State machine definitions are deeply nested JSON that benefits from Jsonnet's
+ability to build objects from smaller pieces. A helper library
+(`sfn.libsonnet`) provides shorthand for common states, and the machine
+definition composes them with `+`.
+→ [`step-functions.jsonnet`](examples/step-functions.jsonnet) (245 lines → 7 resources)
+
+### Starting a greenfield project
+
+For a new project that has nothing to migrate:
+
+1. Copy `lib/cfn.libsonnet` and `lib/aws.libsonnet` into your repo
+2. Copy `lib/cfn-actions.libsonnet` if you want pre-defined IAM action lists
+3. Write `.jsonnet` files importing these libraries
+4. Add project-specific factories as local functions or in a `lib/` file
+
+There's no framework to initialize, no bootstrap step, and no convention to
+follow beyond "functions return objects, merge with `+`." Start with inline
+local functions. Extract to a shared `.libsonnet` file when the same pattern
+appears in a second stack.
+
 ## Trade-offs
 
 **What you gain:**
@@ -691,8 +778,9 @@ reordered. CloudFormation doesn't care about key order, but it makes the output
 harder to diff against hand-written templates or the original Serverless/SAM
 output, and reduces the readability of the generated JSON.
 
-I maintain a fork of jsonnet-go that adds a `--preserve-field-order` flag:
-[github.com/vivainio/go-jsonnet-fork](https://github.com/vivainio/go-jsonnet-fork).
+I maintain a fork of jsonnet-go that adds a `--preserve-field-order` flag.
+Pre-built binaries are available at
+[github.com/vivainio/go-jsonnet-fork v0.22.1-fork.1](https://github.com/vivainio/go-jsonnet-fork/releases/tag/v0.22.1-fork.1).
 With this flag, keys appear in the order you wrote them in the `.jsonnet` file,
 which makes diffs cleaner and the output easier to read. I plan to propose this
 for upstream after more usage.
