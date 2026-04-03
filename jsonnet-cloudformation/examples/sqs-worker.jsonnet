@@ -49,12 +49,12 @@ local tags = cfn.tags({
       {
         Effect: 'Allow',
         Action: ['sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:GetQueueAttributes'],
-        Resource: [{ 'Fn::GetAtt': ['OrderQueue', 'Arn'] }],
+        Resource: [cfn.getAtt('OrderQueue', 'Arn')],
       },
       {
         Effect: 'Allow',
         Action: ['dynamodb:PutItem'],
-        Resource: { 'Fn::Sub': 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage },
+        Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage),
       },
     ])
 
@@ -87,13 +87,13 @@ local tags = cfn.tags({
     + cfn.sqsQueue(
       'OrderQueue',
       visibilityTimeout=180,
-      dlqArn={ 'Fn::GetAtt': ['OrderDLQ', 'Arn'] },
+      dlqArn=cfn.getAtt('OrderDLQ', 'Arn'),
       maxReceiveCount=3,
       tags=tags,
     ),
 
   Outputs: {
-    QueueUrl: { Value: { Ref: 'OrderQueue' } },
-    DLQUrl:   { Value: { Ref: 'OrderDLQ' } },
+    QueueUrl: { Value: cfn.ref('OrderQueue') },
+    DLQUrl:   { Value: cfn.ref('OrderDLQ') },
   },
 }

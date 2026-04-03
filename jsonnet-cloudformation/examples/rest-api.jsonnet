@@ -60,7 +60,7 @@ local methods = [
       {
         Effect: 'Allow',
         Action: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query'],
-        Resource: { 'Fn::Sub': 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-*' },
+        Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-*'),
       },
     ])
 
@@ -77,8 +77,8 @@ local methods = [
     + cfn.restApi(stage + '-' + service)
 
     // Resource tree: /todos and /todos/{id}
-    + cfn.apiResource(r.todos,  { 'Fn::GetAtt': ['ApiGatewayRestApi', 'RootResourceId'] }, 'todos')
-    + cfn.apiResource(r.todoId, { Ref: r.todos }, '{id}')
+    + cfn.apiResource(r.todos,  cfn.getAtt('ApiGatewayRestApi', 'RootResourceId'), 'todos')
+    + cfn.apiResource(r.todoId, cfn.ref(r.todos), '{id}')
 
     // Methods on /todos
     + cfn.apiMethod('ApiGatewayMethodTodosGet',  r.todos, 'GET',  fn, apiKeyRequired=true)
@@ -97,7 +97,7 @@ local methods = [
 
   Outputs: {
     ServiceEndpoint: {
-      Value: { 'Fn::Sub': 'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/' + stage },
+      Value: cfn.sub('https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/' + stage),
     },
   },
 }

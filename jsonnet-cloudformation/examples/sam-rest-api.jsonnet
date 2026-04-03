@@ -63,7 +63,7 @@ local apiHandler = sam.Function('Api', {
     Statement: [{
       Effect: 'Allow',
       Action: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query'],
-      Resource: { 'Fn::Sub': 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-' + stage },
+      Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-' + stage),
     }],
   }],
   Events: {
@@ -91,7 +91,7 @@ local api = sam.Api('TodoApi', {
     + api.resources,
   Outputs: {
     Endpoint: {
-      Value: { 'Fn::Sub': 'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/' + stage },
+      Value: cfn.sub('https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/' + stage),
     },
   },
 }

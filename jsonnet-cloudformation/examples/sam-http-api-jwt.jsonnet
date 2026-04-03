@@ -39,7 +39,7 @@ local apiHandler = sam.Function('Api', {
     Statement: [{
       Effect: 'Allow',
       Action: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan'],
-      Resource: { 'Fn::Sub': 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage },
+      Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage),
     }],
   }],
   Events: {
@@ -74,7 +74,7 @@ local httpApi = sam.HttpApi('UserHttpApi', {
     + httpApi.resources,
   Outputs: {
     Endpoint: {
-      Value: { 'Fn::Sub': 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}' },
+      Value: cfn.sub('https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'),
     },
   },
 }

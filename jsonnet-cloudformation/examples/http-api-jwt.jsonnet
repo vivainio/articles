@@ -32,7 +32,7 @@ local service = 'user-api';
 local stage   = std.extVar('stage');
 
 local authorizerLogical = 'HttpApiAuthorizerAuth0';
-local authRef = { Ref: authorizerLogical };
+local authRef = cfn.ref(authorizerLogical);
 
 {
   AWSTemplateFormatVersion: '2010-09-09',
@@ -43,7 +43,7 @@ local authRef = { Ref: authorizerLogical };
       {
         Effect: 'Allow',
         Action: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan'],
-        Resource: { 'Fn::Sub': 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage },
+        Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage),
       },
     ])
 
@@ -78,7 +78,7 @@ local authRef = { Ref: authorizerLogical };
 
   Outputs: {
     ApiEndpoint: {
-      Value: { 'Fn::Sub': 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}' },
+      Value: cfn.sub('https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'),
     },
   },
 }

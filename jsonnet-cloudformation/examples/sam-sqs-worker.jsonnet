@@ -40,12 +40,12 @@ local processor = sam.Function('Processor', {
       {
         Effect: 'Allow',
         Action: ['sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:GetQueueAttributes'],
-        Resource: [{ 'Fn::GetAtt': ['OrderQueue', 'Arn'] }],
+        Resource: [cfn.getAtt('OrderQueue', 'Arn')],
       },
       {
         Effect: 'Allow',
         Action: ['dynamodb:PutItem'],
-        Resource: { 'Fn::Sub': 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage },
+        Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage),
       },
     ],
   }],
@@ -53,7 +53,7 @@ local processor = sam.Function('Processor', {
     OrderEvent: {
       Type: 'SQS',
       Properties: {
-        Queue: { 'Fn::GetAtt': ['OrderQueue', 'Arn'] },
+        Queue: cfn.getAtt('OrderQueue', 'Arn'),
         BatchSize: 10,
       },
     },
@@ -70,12 +70,12 @@ local processor = sam.Function('Processor', {
     + cfn.sqsQueue('OrderDLQ', tags=tags)
     + cfn.sqsQueue('OrderQueue',
       visibilityTimeout=180,
-      dlqArn={ 'Fn::GetAtt': ['OrderDLQ', 'Arn'] },
+      dlqArn=cfn.getAtt('OrderDLQ', 'Arn'),
       maxReceiveCount=3,
       tags=tags,
     ),
   Outputs: {
-    QueueUrl: { Value: { Ref: 'OrderQueue' } },
-    DLQUrl:   { Value: { Ref: 'OrderDLQ' } },
+    QueueUrl: { Value: cfn.ref('OrderQueue') },
+    DLQUrl:   { Value: cfn.ref('OrderDLQ') },
   },
 }
