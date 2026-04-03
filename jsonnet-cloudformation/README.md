@@ -56,7 +56,10 @@ transform, and without a Node.js build step?
 compiles to JSON. It has functions, imports, and object merging — enough to
 build a library of helpers that generate CloudFormation resources. The binary
 is a single ~2MB executable with no runtime dependencies. Compilation is
-instant.
+instant. Jsonnet is already widely used for generating Kubernetes manifests
+(via [Tanka](https://tanka.dev/) and ksonnet) — templating large, repetitive
+JSON/YAML configurations is exactly what it was designed for, and
+CloudFormation is the same kind of problem.
 
 Jsonnet gives you the same power of abstraction as CDK — functions, local
 variables, imports, conditionals, array comprehensions, object merging — but
