@@ -11,9 +11,14 @@ local service = 'my-app';
 local stage = std.extVar('stage');
 local table = service + '-' + stage;
 local bucket = service + '-' + stage + '-data';
+local partner = cfn.ref('PartnerAccountId');
 
 {
   AWSTemplateFormatVersion: '2010-09-09',
+
+  Parameters: {
+    PartnerAccountId: cfn.param(description='AWS account ID allowed to invoke the function'),
+  },
 
   Resources:
     aws.lambdaG('App', {
@@ -33,6 +38,11 @@ local bucket = service + '-' + stage + '-data';
       DataBucket: aws.bucket(bucket),
       TableNameParam: cfn.ssmOutput('/' + service + '/' + stage + '/table-name', cfn.ref('DataTable')),
       BucketNameParam: cfn.ssmOutput('/' + service + '/' + stage + '/bucket-name', cfn.ref('DataBucket')),
+
+      // Cross-account role: partner can invoke our Lambda
+      PartnerInvokerRole: aws.assumableRole([partner], [
+        cfn.allow(actions.lambdaInvoke, cfn.getArn('AppFunction')),
+      ]),
     },
 
   Outputs: {
