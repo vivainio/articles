@@ -34,6 +34,11 @@
   // ── KMS ───────────────────────────────────────────────────────────────────
   kmsDecrypt: ['kms:Decrypt', 'kms:GenerateDataKey'],
 
+  // ── ECR ────────────────────────────────────────────────────────────────────
+  ecrPull: ['ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage', 'ecr:BatchCheckLayerAvailability'],
+  ecrPush: ['ecr:PutImage', 'ecr:InitiateLayerUpload', 'ecr:UploadLayerPart', 'ecr:CompleteLayerUpload'],
+  ecrAll: self.ecrPull + self.ecrPush,
+
   // ── EC2 / VPC (for Lambda in VPC) ─────────────────────────────────────────
   ec2Eni: ['ec2:CreateNetworkInterface', 'ec2:DescribeNetworkInterfaces', 'ec2:DeleteNetworkInterface'],
 }

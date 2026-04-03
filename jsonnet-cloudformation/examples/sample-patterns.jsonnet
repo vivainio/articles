@@ -139,6 +139,37 @@ local policies = {
     [cfn.allow(actions.lambdaInvoke, fnArn)],
 };
 
+// ── ECR repository factory ─────────────────────────────────────────────
+// A shared ECR repo needs the same 7 actions listed for CodeBuild and
+// again for cross-account principals. The YAML original copy-pastes the
+// action list twice per repo, and duplicates the entire template when a
+// second repo is needed. Here, one function covers both cases.
+
+local ecrRepo(name, crossAccountIds=[], tags=[]) = {
+  Type: 'AWS::ECR::Repository',
+  Properties: {
+    RepositoryName: name,
+    RepositoryPolicyText: {
+      Version: '2012-10-17',
+      Statement:
+        [{
+          Sid: 'CodeBuildAccess',
+          Effect: 'Allow',
+          Principal: { Service: 'codebuild.amazonaws.com' },
+          Action: actions.ecrAll,
+        }]
+        + (if crossAccountIds != [] then [{
+             Sid: 'CrossAccountAccess',
+             Effect: 'Allow',
+             Principal: {
+               AWS: ['arn:aws:iam::' + id + ':root' for id in crossAccountIds],
+             },
+             Action: actions.ecrAll,
+           }] else []),
+    },
+  } + (if tags != [] then { Tags: tags } else {}),
+};
+
 // ── Service wiring ─────────────────────────────────────────────────────
 // A sample app with an API Lambda, two SQS workers, and shared resources.
 // Shows how the queue factory and policy library compose.
@@ -231,6 +262,12 @@ local workerLambda = aws.lambda('Worker', {
 
       // S3 store bucket
       StoreBucket: aws.bucket(bucketName),
+
+      // ECR repos — same factory, different cross-account lists
+      AppRepo: ecrRepo(service + '-app', tags=tags),
+      RuntimeRepo: ecrRepo(service + '-runtime',
+                           crossAccountIds=['111111111111', '222222222222'],
+                           tags=tags),
     },
 
   Outputs: {
