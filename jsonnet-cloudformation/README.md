@@ -7,9 +7,9 @@ license](https://www.serverless.com/blog/serverless-framework-v4-a-new-model).
 Deployments now require a Serverless Inc. account, report telemetry to their
 dashboard, and organizations above a revenue threshold need a paid
 subscription. The open-source v3 branch is frozen — no security patches, no
-new runtime support. (See also the [community
-discussion](https://github.com/serverless/serverless/discussions/12506) on the
-license change.)
+new runtime support. (See also the [Hacker News
+discussion](https://news.ycombinator.com/item?id=43421598) on the license
+change.)
 
 If you have dozens of services in production, this means either paying per seat
 for a build tool that wraps CloudFormation, or migrating. Most teams start
