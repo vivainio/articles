@@ -1,5 +1,22 @@
 # Ejecting Serverless with Jsonnet
 
+## Contents
+
+- [Why leave](#why-leave) — SAM, CDK, Terraform, and what we actually need
+- [The migration path](#the-migration-path) — how to port existing stacks
+- [The boilerplate problem](#the-boilerplate-problem) — what SLS/SAM hide from you
+- [The Jsonnet approach](#the-jsonnet-approach) — what the replacement looks like
+- [What the library wraps](#what-the-library-wraps) — mapping SLS/SAM concepts to helpers
+- [Examples](#examples) — scheduled worker, REST API, SQS consumer, HTTP API
+- [Multi-stage from a single file](#multi-stage-from-a-single-file)
+- [Deploying code separately](#deploying-code-separately) — update-function-code vs S3
+- [Comparison](#comparison) — source lines, output transparency, build deps
+- [How it works](#how-it-works) — object merging and custom abstractions
+- [Replacing SAM with sam.libsonnet](#replacing-sam-with-samlibsonnet) — SAM-shaped input, plain CFN output
+- [Trade-offs](#trade-offs) — what you gain and lose
+- [Getting started](#getting-started)
+- [Caveats](#caveats) — key ordering, maturity, AI authorship
+
 ## Why leave
 
 Serverless Framework v4 [switched to a commercial
