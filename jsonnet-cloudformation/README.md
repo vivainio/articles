@@ -285,6 +285,15 @@ REST API — no resource tree, no CORS mocks, auto-deploy stage.
 
 → [`examples/http-api-jwt.jsonnet`](examples/http-api-jwt.jsonnet)
 
+### 5. Parameterized worker (91 lines → 5 resources)
+
+A VPC-attached Lambda with CloudFormation input parameters: stage selection
+with `AllowedValues`, VPC/subnet IDs, an SSM parameter for secrets, and a
+cross-stack export. Demonstrates `cfn.param()`, `cfn.ssmParam()`, and
+`cfn.exportOutput()`.
+
+→ [`examples/parameterized-worker.jsonnet`](examples/parameterized-worker.jsonnet)
+
 ## Multi-stage from a single file
 
 Every example accepts `stage` as an external variable:

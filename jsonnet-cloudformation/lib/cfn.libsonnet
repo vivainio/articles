@@ -20,6 +20,17 @@
   sub(str):: { 'Fn::Sub': str },
   ref(logical):: { Ref: logical },
 
+  // ── Parameter shorthands ───────────────────────────────────────────────────
+  param(type='String', default=null, description=null, allowed=null)::
+    { Type: type }
+    + (if default != null then { Default: default } else {})
+    + (if description != null then { Description: description } else {})
+    + (if allowed != null then { AllowedValues: allowed } else {}),
+
+  ssmParam(path, description=null)::
+    { Type: 'AWS::SSM::Parameter::Value<String>', Default: path }
+    + (if description != null then { Description: description } else {}),
+
   // ── Output shorthands ──────────────────────────────────────────────────────
   output(value):: { Value: value },
   exportOutput(value, name):: { Value: value, Export: { Name: name } },
