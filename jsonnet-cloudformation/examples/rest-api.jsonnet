@@ -29,6 +29,7 @@
 //         - http: { method: delete, path: /todos/{id}, cors: true, private: true }
 
 local cfn = import '../lib/cfn.libsonnet';
+local sls = import '../lib/sls.libsonnet';
 local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'todo-api';
@@ -57,13 +58,13 @@ local methods = [
   AWSTemplateFormatVersion: '2010-09-09',
 
   Resources:
-    cfn.deploymentBucket
-    + cfn.iamRole(service + '-' + stage, [
+    sls.deploymentBucket
+    + sls.iamRole(service + '-' + stage, [
       cfn.allow(actions.ddbRead + actions.ddbWrite, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-*')),
     ])
 
     // Single Lambda function serving all routes
-    + cfn.lambdaFn(
+    + sls.lambdaFn(
       logicalName='Api',
       functionName=service + '-' + stage + '-api',
       handler='wsgi_handler.handler',
@@ -73,26 +74,26 @@ local methods = [
     )
 
     // REST API
-    + cfn.restApi(stage + '-' + service)
+    + sls.restApi(stage + '-' + service)
 
     // Resource tree: /todos and /todos/{id}
-    + cfn.apiResource(r.todos,  cfn.getAtt('ApiGatewayRestApi', 'RootResourceId'), 'todos')
-    + cfn.apiResource(r.todoId, cfn.ref(r.todos), '{id}')
+    + sls.apiResource(r.todos,  cfn.getAtt('ApiGatewayRestApi', 'RootResourceId'), 'todos')
+    + sls.apiResource(r.todoId, cfn.ref(r.todos), '{id}')
 
     // Methods on /todos
-    + cfn.apiMethod('ApiGatewayMethodTodosGet',  r.todos, 'GET',  fn, apiKeyRequired=true)
-    + cfn.apiMethod('ApiGatewayMethodTodosPost', r.todos, 'POST', fn, apiKeyRequired=true)
-    + cfn.corsOptions('ApiGatewayMethodTodosOptions', r.todos, ['GET', 'POST'])
+    + sls.apiMethod('ApiGatewayMethodTodosGet',  r.todos, 'GET',  fn, apiKeyRequired=true)
+    + sls.apiMethod('ApiGatewayMethodTodosPost', r.todos, 'POST', fn, apiKeyRequired=true)
+    + sls.corsOptions('ApiGatewayMethodTodosOptions', r.todos, ['GET', 'POST'])
 
     // Methods on /todos/{id}
-    + cfn.apiMethod('ApiGatewayMethodTodosIdVarGet',    r.todoId, 'GET',    fn, apiKeyRequired=true)
-    + cfn.apiMethod('ApiGatewayMethodTodosIdVarPut',    r.todoId, 'PUT',    fn, apiKeyRequired=true)
-    + cfn.apiMethod('ApiGatewayMethodTodosIdVarDelete', r.todoId, 'DELETE', fn, apiKeyRequired=true)
-    + cfn.corsOptions('ApiGatewayMethodTodosIdVarOptions', r.todoId, ['GET', 'PUT', 'DELETE'])
+    + sls.apiMethod('ApiGatewayMethodTodosIdVarGet',    r.todoId, 'GET',    fn, apiKeyRequired=true)
+    + sls.apiMethod('ApiGatewayMethodTodosIdVarPut',    r.todoId, 'PUT',    fn, apiKeyRequired=true)
+    + sls.apiMethod('ApiGatewayMethodTodosIdVarDelete', r.todoId, 'DELETE', fn, apiKeyRequired=true)
+    + sls.corsOptions('ApiGatewayMethodTodosIdVarOptions', r.todoId, ['GET', 'PUT', 'DELETE'])
 
     // Deployment + permission
-    + cfn.apiDeployment('ApiGatewayDeployment', stage, dependsOn=methods)
-    + cfn.apiLambdaPermission('ApiLambdaPermissionApiGateway', fn),
+    + sls.apiDeployment('ApiGatewayDeployment', stage, dependsOn=methods)
+    + sls.apiLambdaPermission('ApiLambdaPermissionApiGateway', fn),
 
   Outputs: {
     ServiceEndpoint: cfn.output(cfn.sub('https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/' + stage)),

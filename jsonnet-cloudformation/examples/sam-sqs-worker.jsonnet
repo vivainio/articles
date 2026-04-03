@@ -19,6 +19,7 @@
 
 local sam = import '../lib/sam.libsonnet';
 local cfn = import '../lib/cfn.libsonnet';
+local sls = import '../lib/sls.libsonnet';
 local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'order-processor';
@@ -54,11 +55,11 @@ local processor = sam.Function('Processor', {
 {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
-    cfn.deploymentBucket
-    + cfn.iamRole(service + '-' + stage, processor.extraStatements)
+    sls.deploymentBucket
+    + sls.iamRole(service + '-' + stage, processor.extraStatements)
     + processor.resources
-    + cfn.sqsQueue('OrderDLQ', tags=tags)
-    + cfn.sqsQueue('OrderQueue',
+    + sls.sqsQueue('OrderDLQ', tags=tags)
+    + sls.sqsQueue('OrderQueue',
       visibilityTimeout=180,
       dlqArn=cfn.getAtt('OrderDLQ', 'Arn'),
       maxReceiveCount=3,

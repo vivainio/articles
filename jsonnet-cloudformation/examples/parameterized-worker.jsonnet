@@ -12,6 +12,7 @@
 //     --capabilities CAPABILITY_NAMED_IAM
 
 local cfn = import '../lib/cfn.libsonnet';
+local sls = import '../lib/sls.libsonnet';
 local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'data-processor';
@@ -43,13 +44,13 @@ local service = 'data-processor';
   },
 
   Resources:
-    cfn.deploymentBucket
-    + cfn.iamRole(service + '-dev', [
+    sls.deploymentBucket
+    + sls.iamRole(service + '-dev', [
       cfn.allow(actions.s3Read + actions.s3Write, cfn.sub('arn:aws:s3:::${Stage}-data-bucket/*')),
     ], managedPolicies=[
       'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',
     ])
-    + cfn.lambdaFn(
+    + sls.lambdaFn(
       logicalName='Processor',
       functionName=service + '-processor',
       handler='src/processor.handler',
@@ -67,7 +68,7 @@ local service = 'data-processor';
         SubnetIds: cfn.ref('SubnetIds'),
       },
     )
-    + cfn.scheduleEvent('Processor', 'rate(1 hour)')
+    + sls.scheduleEvent('Processor', 'rate(1 hour)')
     + {
       // Security group — pass-through as raw Jsonnet
       LambdaSG: {

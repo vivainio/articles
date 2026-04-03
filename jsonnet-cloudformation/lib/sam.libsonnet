@@ -5,16 +5,17 @@
 // the same expansion at build time via Jsonnet, producing plain CFN JSON.
 //
 // The developer writes SAM-shaped declarations (Function with inline Events,
-// Api with Auth), and this library calls cfn.libsonnet to generate the
+// Api with Auth), and this library calls sls.libsonnet to generate the
 // underlying resources.
 //
 // Usage:
 //   local sam = import 'lib/sam.libsonnet';
 //   local fn = sam.Function('Api', { Handler: 'app.handler', Events: {...} }, globals.Function);
 //   local api = sam.Api('MyApi', { StageName: 'dev' }, [fn], service='my-svc');
-//   { Resources: cfn.iamRole(..., fn.extraStatements) + fn.resources + api.resources }
+//   { Resources: sls.iamRole(..., fn.extraStatements) + fn.resources + api.resources }
 
 local cfn = import 'cfn.libsonnet';
+local sls = import 'sls.libsonnet';
 
 {
   // ── Internal helpers ───────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ local cfn = import 'cfn.libsonnet';
   //
   // Returns an object with:
   //   .resources       — CFN resource map (merge into Resources with +)
-  //   .extraStatements — IAM statements extracted from Policies (pass to cfn.iamRole)
+  //   .extraStatements — IAM statements extracted from Policies (pass to sls.iamRole)
   //   .apiEvents       — Api events for the Api expander to consume
   //   .httpApiEvents   — HttpApi events for the HttpApi expander to consume
   //   .functionLogical — logical ID of the Lambda::Function resource
@@ -131,7 +132,7 @@ local cfn = import 'cfn.libsonnet';
         local ep = get(e, 'Properties', {});
         acc + (
           if e.Type == 'Schedule' then
-            cfn.scheduleEvent(
+            sls.scheduleEvent(
               logicalName,
               get(ep, 'Schedule', get(ep, 'ScheduleExpression', '')),
               get(ep, 'Enabled', true),
@@ -139,7 +140,7 @@ local cfn = import 'cfn.libsonnet';
             )
           else if e.Type == 'SQS' then
             local arn = get(ep, 'Queue', get(ep, 'Arn'));
-            cfn.sqsEventSource(
+            sls.sqsEventSource(
               logicalName + eName + 'EventSourceMapping',
               logicalName + 'LambdaFunction',
               // If arn is a GetAtt reference, pass through; otherwise wrap
@@ -169,7 +170,7 @@ local cfn = import 'cfn.libsonnet';
 
     {
       resources:
-        cfn.lambdaFn(
+        sls.lambdaFn(
           logicalName=logicalName,
           functionName=functionName,
           handler=handler,
@@ -261,14 +262,14 @@ local cfn = import 'cfn.libsonnet';
 
     // Resource tree
     local resourceResources = std.foldl(
-      function(acc, seg) acc + cfn.apiResource(segLogical(seg), parentId(seg), lastPart(seg)),
+      function(acc, seg) acc + sls.apiResource(segLogical(seg), parentId(seg), lastPart(seg)),
       allSegments, {}
     );
 
     // Methods
     local methodLogical(path, method) = 'ApiGatewayMethod' + pathToLogical(path) + titleCase(method);
     local methodResources = std.foldl(
-      function(acc, r) acc + cfn.apiMethod(
+      function(acc, r) acc + sls.apiMethod(
         methodLogical(r.path, r.method), segLogical(r.path),
         r.method, r.functionLogical, apiKeyRequired=r.apiKeyRequired,
       ),
@@ -279,7 +280,7 @@ local cfn = import 'cfn.libsonnet';
     local corsLogical(path) = 'ApiGatewayMethod' + pathToLogical(path) + 'Options';
     local methodsForPath(path) = [r.method for r in allRoutes if r.path == path];
     local corsResources = std.foldl(
-      function(acc, path) acc + cfn.corsOptions(
+      function(acc, path) acc + sls.corsOptions(
         corsLogical(path), segLogical(path), methodsForPath(path),
       ),
       allPaths, {}
@@ -293,7 +294,7 @@ local cfn = import 'cfn.libsonnet';
     // Lambda permissions (one per unique function)
     local uniqueFns = std.set([r.functionLogical for r in allRoutes]);
     local permResources = std.foldl(
-      function(acc, fl) acc + cfn.apiLambdaPermission(fl + 'PermissionApiGateway', fl),
+      function(acc, fl) acc + sls.apiLambdaPermission(fl + 'PermissionApiGateway', fl),
       uniqueFns, {}
     );
 
@@ -302,11 +303,11 @@ local cfn = import 'cfn.libsonnet';
 
     {
       resources:
-        cfn.restApi(apiName)
+        sls.restApi(apiName)
         + resourceResources
         + methodResources
         + corsResources
-        + cfn.apiDeployment('ApiGatewayDeployment', stage, dependsOn=allMethodIds)
+        + sls.apiDeployment('ApiGatewayDeployment', stage, dependsOn=allMethodIds)
         + permResources
         + (if hasUsagePlan then {
           ApiGatewayApiKey1: {
@@ -356,7 +357,7 @@ local cfn = import 'cfn.libsonnet';
     local authResources = std.foldl(
       function(acc, aName)
         local a = authCfg[aName];
-        acc + cfn.httpApiJwtAuthorizer(
+        acc + sls.httpApiJwtAuthorizer(
           'HttpApiAuthorizer' + titleCase(aName),
           aName,
           a.Issuer,
@@ -381,13 +382,13 @@ local cfn = import 'cfn.libsonnet';
           for n in std.objectFields(fn.httpApiEvents)
         ];
         local fnName = std.strReplace(fn.functionLogical, 'LambdaFunction', '');
-        acc + cfn.httpApiFn(fnName, fn.functionLogical, routes),
+        acc + sls.httpApiFn(fnName, fn.functionLogical, routes),
       functions, {}
     );
 
     {
       resources:
-        cfn.httpApi(name)
+        sls.httpApi(name)
         + authResources
         + fnResources,
     },

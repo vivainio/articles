@@ -153,8 +153,8 @@ The steps:
    in this article.
 
 3. **Factor out** each pattern into a library call. The 120-line Lambda triplet
-   becomes `cfn.lambdaFn(...)`. The 50-line CORS OPTIONS mock becomes
-   `cfn.corsOptions(...)`. Service-specific resources (DynamoDB tables, custom
+   becomes `sls.lambdaFn(...)`. The 50-line CORS OPTIONS mock becomes
+   `sls.corsOptions(...)`. Service-specific resources (DynamoDB tables, custom
    IAM statements) stay as inline Jsonnet objects.
 
 4. **Verify** by diffing the Jsonnet output against the captured original:
@@ -225,14 +225,15 @@ CloudFormation resources:
 
 ```jsonnet
 local cfn = import 'lib/cfn.libsonnet';
+local sls = import 'lib/sls.libsonnet';
 
 {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
-    cfn.deploymentBucket
-    + cfn.iamRole('my-service-dev', [...])
-    + cfn.lambdaFn(logicalName='Worker', functionName='my-service-dev-worker', ...)
-    + cfn.scheduleEvent('Worker', 'cron(0 3 * * ? *)'),
+    sls.deploymentBucket
+    + sls.iamRole('my-service-dev', [...])
+    + sls.lambdaFn(logicalName='Worker', functionName='my-service-dev-worker', ...)
+    + sls.scheduleEvent('Worker', 'cron(0 3 * * ? *)'),
 }
 ```
 
@@ -245,15 +246,15 @@ Each helper maps to what SLS/SAM auto-generated from a high-level declaration:
 
 | SLS / SAM concept | Library helper | CFN resources generated |
 |---|---|---|
-| `functions:` entry | `cfn.lambdaFn(...)` | LogGroup + Function + Version |
-| `events: - schedule:` | `cfn.scheduleEvent(...)` | Events::Rule + Lambda::Permission |
-| `events: - sqs:` | `cfn.sqsEventSource(...)` | Lambda::EventSourceMapping |
-| `events: - http:` | `cfn.apiMethod(...)` + `cfn.corsOptions(...)` | Method + CORS OPTIONS mock |
-| `events: - httpApi:` | `cfn.httpApiFn(...)` | Integration + Routes + Permission |
-| `provider.iamRoleStatements` | `cfn.iamRole(...)` | IAM::Role with scoped log perms |
+| `functions:` entry | `sls.lambdaFn(...)` | LogGroup + Function + Version |
+| `events: - schedule:` | `sls.scheduleEvent(...)` | Events::Rule + Lambda::Permission |
+| `events: - sqs:` | `sls.sqsEventSource(...)` | Lambda::EventSourceMapping |
+| `events: - http:` | `sls.apiMethod(...)` + `sls.corsOptions(...)` | Method + CORS OPTIONS mock |
+| `events: - httpApi:` | `sls.httpApiFn(...)` | Integration + Routes + Permission |
+| `provider.iamRoleStatements` | `sls.iamRole(...)` | IAM::Role with scoped log perms |
 | `provider.apiKeys` | (manual) | ApiKey + UsagePlan + UsagePlanKey |
-| implicit | `cfn.deploymentBucket` | S3::Bucket + BucketPolicy |
-| SLS log-subscription plugin | `cfn.lambdaFn(..., logDestination=...)` | Logs::SubscriptionFilter |
+| implicit | `sls.deploymentBucket` | S3::Bucket + BucketPolicy |
+| SLS log-subscription plugin | `sls.lambdaFn(..., logDestination=...)` | Logs::SubscriptionFilter |
 
 ## Examples
 
@@ -343,7 +344,7 @@ For a REST API with 5 routes:
 | Serverless Framework v4 | ~45 | Generated CFN (opaque) | Node.js + SLS account |
 | SAM template | ~110 | SAM transform output (opaque) | Python or Node.js |
 | AWS CDK (TypeScript) | ~60 | Generated CFN (hashed IDs) | Node.js + npm install + cdk synth |
-| **Jsonnet + cfn.libsonnet** | **~100** | **Exactly what you wrote** | **Single binary, no deps** |
+| **Jsonnet + sls.libsonnet** | **~100** | **Exactly what you wrote** | **Single binary, no deps** |
 | **Jsonnet + sam.libsonnet** | **~80–97** | **Exactly what you wrote** | **Single binary, no deps** |
 
 The Jsonnet source is comparable in size to SAM, but the output is plain
@@ -369,10 +370,10 @@ Objects are merged with `+`:
 
 ```jsonnet
 Resources:
-  cfn.deploymentBucket           // S3 bucket + policy
-  + cfn.iamRole(...)             // IAM role
-  + cfn.lambdaFn(...)            // LogGroup + Function + Version
-  + cfn.scheduleEvent(...)       // Events::Rule + Permission
+  sls.deploymentBucket           // S3 bucket + policy
+  + sls.iamRole(...)             // IAM role
+  + sls.lambdaFn(...)            // LogGroup + Function + Version
+  + sls.scheduleEvent(...)       // Events::Rule + Permission
 ```
 
 This is the key design: each helper is independent, there's no hidden state,
@@ -424,7 +425,7 @@ a shared library as a mixin that you merge alongside the Lambda:
 // lib/company.libsonnet — shared abstractions across all services
 {
   // Returns a SubscriptionFilter resource that forwards a Lambda's logs
-  // to the central Firehose. Merge with `+` next to cfn.lambdaFn().
+  // to the central Firehose. Merge with `+` next to sls.lambdaFn().
   logForwarding(logicalName, functionName, firehoseArn, roleArn):: {
     [logicalName + 'LogSubscription']: {
       Type: 'AWS::Logs::SubscriptionFilter',
@@ -446,12 +447,12 @@ Services compose it with `+`, just like any other resource block:
 local co = import 'lib/company.libsonnet';
 
 Resources:
-  cfn.lambdaFn(logicalName='Worker', functionName=fnName, ...)
+  sls.lambdaFn(logicalName='Worker', functionName=fnName, ...)
   + co.logForwarding('Worker', fnName, firehoseArn, logRoleArn)
-  + cfn.scheduleEvent('Worker', 'cron(0 3 * * ? *)'),
+  + sls.scheduleEvent('Worker', 'cron(0 3 * * ? *)'),
 ```
 
-No wrapping, no override — `cfn.lambdaFn` stays untouched and the mixin is
+No wrapping, no override — `sls.lambdaFn` stays untouched and the mixin is
 just another object merged in. This is the same pattern CDK teams achieve with
 custom constructs, but the abstraction is a pure data transformation: you can
 print the output, diff it, and reason about it without running anything.
@@ -505,7 +506,7 @@ the output.
 
 If you're already using SAM templates (or thinking in SAM terms), there's a
 second library — `sam.libsonnet` — that accepts SAM-shaped declarations and
-expands them to raw CloudFormation through `cfn.libsonnet`.
+expands them to raw CloudFormation through `sls.libsonnet`.
 
 ### Why replace SAM?
 
@@ -532,7 +533,7 @@ methods, EventSourceMappings, permissions). `sam.libsonnet` does the same:
 
 ```jsonnet
 local sam = import 'lib/sam.libsonnet';
-local cfn = import 'lib/cfn.libsonnet';
+local sls = import 'lib/sls.libsonnet';
 
 local fn = sam.Function('Api', {
   Handler: 'app.handler',
@@ -550,7 +551,7 @@ local api = sam.Api('MyApi', {
 {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
-    cfn.iamRole('my-service-dev', fn.extraStatements)
+    sls.iamRole('my-service-dev', fn.extraStatements)
     + fn.resources     // LogGroup + Function + Version
     + api.resources,   // RestApi + Resources + Methods + CORS + Deployment
 }
@@ -558,7 +559,7 @@ local api = sam.Api('MyApi', {
 
 The `sam.Function()` call returns:
 - `.resources` — the Lambda triplet (and any non-API event resources)
-- `.extraStatements` — IAM statements extracted from `Policies:` (pass to `cfn.iamRole`)
+- `.extraStatements` — IAM statements extracted from `Policies:` (pass to `sls.iamRole`)
 - `.apiEvents` / `.httpApiEvents` — collected for the API expander
 
 The `sam.Api()` call consumes those collected events and generates the full API
@@ -589,7 +590,7 @@ to Globals.
 
 ### SAM examples
 
-These produce the same CloudFormation output as the direct cfn.libsonnet
+These produce the same CloudFormation output as the direct sls.libsonnet
 examples, but with SAM-style input:
 
 | Example | Lines | Resources |
@@ -613,12 +614,16 @@ examples, but with SAM-style input:
 
 ### Two layers, one output
 
-The two libraries complement each other:
+The three libraries complement each other:
 
-- **`cfn.libsonnet`** — low-level helpers, one per CFN resource pattern. You
-  wire resources together explicitly. Maximum control.
+- **`cfn.libsonnet`** — general-purpose CloudFormation helpers: intrinsic
+  function shorthands (`getAtt`, `sub`, `ref`), IAM policy builders (`allow`,
+  `deny`, `policies`), parameter and output helpers, and tag conversion.
+- **`sls.libsonnet`** — serverless resource builders, one per CFN resource
+  pattern: `lambdaFn`, `iamRole`, `deploymentBucket`, API Gateway, SQS, and
+  schedule event wiring. You wire resources together explicitly. Maximum control.
 - **`sam.libsonnet`** — high-level SAM-shaped interface. Events are declared
-  inline, API resource trees are generated automatically. Calls `cfn.libsonnet`
+  inline, API resource trees are generated automatically. Calls `sls.libsonnet`
   under the hood.
 
 Both produce the same plain CloudFormation JSON. Choose based on how much
@@ -645,8 +650,8 @@ automation you want vs. how much control you need.
 ## Getting started
 
 1. Install Jsonnet: `brew install jsonnet` / `apt install jsonnet`
-2. Copy `lib/cfn.libsonnet` into your project (and `lib/sam.libsonnet` if you
-   want the SAM-style interface)
+2. Copy `lib/cfn.libsonnet` and `lib/sls.libsonnet` into your project (and
+   `lib/sam.libsonnet` if you want the SAM-style interface)
 3. Write a `.jsonnet` file importing the library
 4. Render: `jsonnet --ext-str stage=dev my-service.jsonnet > template.json`
 5. Validate: `aws cloudformation validate-template --template-body file://template.json`

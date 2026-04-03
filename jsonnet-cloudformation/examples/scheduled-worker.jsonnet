@@ -25,6 +25,7 @@
 //             enabled: true
 
 local cfn = import '../lib/cfn.libsonnet';
+local sls = import '../lib/sls.libsonnet';
 
 local service = 'snapshot-cleanup';
 local stage   = std.extVar('stage');
@@ -34,11 +35,11 @@ local tags = cfn.tags({ Service: service, Stage: stage });
   AWSTemplateFormatVersion: '2010-09-09',
 
   Resources:
-    cfn.deploymentBucket
-    + cfn.iamRole(service + '-' + stage, [
+    sls.deploymentBucket
+    + sls.iamRole(service + '-' + stage, [
       cfn.allow(['ec2:DescribeSnapshots', 'ec2:DeleteSnapshot'], '*'),
     ])
-    + cfn.lambdaFn(
+    + sls.lambdaFn(
       logicalName='Worker',
       functionName=service + '-' + stage + '-worker',
       handler='handler.cleanup',
@@ -48,7 +49,7 @@ local tags = cfn.tags({ Service: service, Stage: stage });
       timeout=600,
       tags=tags,
     )
-    + cfn.scheduleEvent('Worker', 'cron(0 3 * * ? *)', enabled=true),
+    + sls.scheduleEvent('Worker', 'cron(0 3 * * ? *)', enabled=true),
 
   Outputs: {
     WorkerFunctionArn: cfn.output(cfn.getAtt('WorkerLambdaFunction', 'Arn')),

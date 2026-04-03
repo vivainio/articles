@@ -31,6 +31,7 @@
 //       OrderQueue: ...
 
 local cfn = import '../lib/cfn.libsonnet';
+local sls = import '../lib/sls.libsonnet';
 local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'order-processor';
@@ -45,14 +46,14 @@ local tags = cfn.tags({
   AWSTemplateFormatVersion: '2010-09-09',
 
   Resources:
-    cfn.deploymentBucket
-    + cfn.iamRole(service + '-' + stage, [
+    sls.deploymentBucket
+    + sls.iamRole(service + '-' + stage, [
       cfn.allow(actions.sqsConsume, [cfn.getAtt('OrderQueue', 'Arn')]),
       cfn.allow(actions.ddbWrite, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage)),
     ])
 
     // Lambda consumer — limited to 5 concurrent executions
-    + cfn.lambdaFn(
+    + sls.lambdaFn(
       logicalName='Processor',
       functionName=service + '-' + stage + '-processor',
       handler='src/processor.handler',
@@ -66,7 +67,7 @@ local tags = cfn.tags({
     )
 
     // SQS event source mapping (from `events: - sqs:`)
-    + cfn.sqsEventSource(
+    + sls.sqsEventSource(
       'ProcessorEventSourceMapping',
       'ProcessorLambdaFunction',
       'OrderQueue',
@@ -74,10 +75,10 @@ local tags = cfn.tags({
     )
 
     // Dead-letter queue
-    + cfn.sqsQueue('OrderDLQ', tags=tags)
+    + sls.sqsQueue('OrderDLQ', tags=tags)
 
     // Main queue with redrive policy
-    + cfn.sqsQueue(
+    + sls.sqsQueue(
       'OrderQueue',
       visibilityTimeout=180,
       dlqArn=cfn.getAtt('OrderDLQ', 'Arn'),

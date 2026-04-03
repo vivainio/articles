@@ -40,6 +40,7 @@
 
 local sam = import '../lib/sam.libsonnet';
 local cfn = import '../lib/cfn.libsonnet';
+local sls = import '../lib/sls.libsonnet';
 local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'todo-api';
@@ -81,8 +82,8 @@ local api = sam.Api('TodoApi', {
 {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
-    cfn.deploymentBucket
-    + cfn.iamRole(service + '-' + stage, apiHandler.extraStatements)
+    sls.deploymentBucket
+    + sls.iamRole(service + '-' + stage, apiHandler.extraStatements)
     + apiHandler.resources
     + api.resources,
   Outputs: {

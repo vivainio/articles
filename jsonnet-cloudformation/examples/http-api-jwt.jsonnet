@@ -27,6 +27,7 @@
 //         - httpApi: { method: POST,   path: /users,       authorizer: auth0 }
 
 local cfn = import '../lib/cfn.libsonnet';
+local sls = import '../lib/sls.libsonnet';
 local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'user-api';
@@ -40,13 +41,13 @@ local authRef = cfn.ref(authorizerLogical);
   AWSTemplateFormatVersion: '2010-09-09',
 
   Resources:
-    cfn.deploymentBucket
-    + cfn.iamRole(service + '-' + stage, [
+    sls.deploymentBucket
+    + sls.iamRole(service + '-' + stage, [
       cfn.allow(actions.ddbAll, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
     ])
 
     // Lambda function
-    + cfn.lambdaFn(
+    + sls.lambdaFn(
       logicalName='Api',
       functionName=service + '-' + stage + '-api',
       handler='app.handler',
@@ -56,10 +57,10 @@ local authRef = cfn.ref(authorizerLogical);
     )
 
     // HTTP API + auto-deploy stage
-    + cfn.httpApi(stage + '-' + service)
+    + sls.httpApi(stage + '-' + service)
 
     // JWT authorizer
-    + cfn.httpApiJwtAuthorizer(
+    + sls.httpApiJwtAuthorizer(
       authorizerLogical,
       'auth0',
       'https://example.auth0.com/',
@@ -67,7 +68,7 @@ local authRef = cfn.ref(authorizerLogical);
     )
 
     // Integration + routes + permission (all in one call)
-    + cfn.httpApiFn('Api', 'ApiLambdaFunction', [
+    + sls.httpApiFn('Api', 'ApiLambdaFunction', [
       { logical: 'HttpApiRouteGetUsersIdVar',    routeKey: 'GET /users/{id}',    authorizerId: authRef },
       { logical: 'HttpApiRoutePutUsersIdVar',    routeKey: 'PUT /users/{id}',    authorizerId: authRef },
       { logical: 'HttpApiRouteDeleteUsersIdVar', routeKey: 'DELETE /users/{id}', authorizerId: authRef },
