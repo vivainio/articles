@@ -30,6 +30,13 @@ def main():
         data = json.loads(result.stdout)
         out.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
 
+        lint = subprocess.run(
+            ["cfn-lint", str(out)],
+            capture_output=True, text=True,
+        )
+        if lint.stdout.strip():
+            print(lint.stdout.strip())
+
 
 if __name__ == "__main__":
     main()
