@@ -58,7 +58,7 @@ local methods = [
 
   Resources:
     cfn.deploymentBucket
-    + cfn.iamRole(service, stage, [
+    + cfn.iamRole(service + '-' + stage, [
       cfn.allow(actions.ddbRead + actions.ddbWrite, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-*')),
     ])
 

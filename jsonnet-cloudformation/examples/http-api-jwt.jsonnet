@@ -41,7 +41,7 @@ local authRef = cfn.ref(authorizerLogical);
 
   Resources:
     cfn.deploymentBucket
-    + cfn.iamRole(service, stage, [
+    + cfn.iamRole(service + '-' + stage, [
       cfn.allow(actions.ddbAll, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
     ])
 

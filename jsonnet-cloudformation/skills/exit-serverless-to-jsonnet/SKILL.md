@@ -108,7 +108,7 @@ local extraStatements = [ ... ];
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
     cfn.deploymentBucket
-    + cfn.iamRole(service, stage, extraStatements)
+    + cfn.iamRole(service + '-' + stage, extraStatements)
     + cfn.lambdaFn(...)
     + ...remaining resources...,
   Outputs: { ... },
@@ -284,6 +284,6 @@ IamRoleLambdaExecution → AWS::IAM::Role
   ManagedPolicyArns: [...optional, e.g. VPC access policy...]
 ```
 
-**Replace with:** `cfn.iamRole(service, stage, extraStatements, managedPolicies)`
+**Replace with:** `cfn.iamRole(namePrefix, extraStatements, managedPolicies)`
 
 The base log permissions are generated automatically. Only pass the extra statements.

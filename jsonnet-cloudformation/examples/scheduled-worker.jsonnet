@@ -35,7 +35,7 @@ local tags = cfn.tags({ Service: service, Stage: stage });
 
   Resources:
     cfn.deploymentBucket
-    + cfn.iamRole(service, stage, [
+    + cfn.iamRole(service + '-' + stage, [
       cfn.allow(['ec2:DescribeSnapshots', 'ec2:DeleteSnapshot'], '*'),
     ])
     + cfn.lambdaFn(

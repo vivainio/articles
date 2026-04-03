@@ -46,7 +46,7 @@ local tags = cfn.tags({
 
   Resources:
     cfn.deploymentBucket
-    + cfn.iamRole(service, stage, [
+    + cfn.iamRole(service + '-' + stage, [
       cfn.allow(actions.sqsConsume, [cfn.getAtt('OrderQueue', 'Arn')]),
       cfn.allow(actions.ddbWrite, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage)),
     ])

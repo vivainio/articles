@@ -55,7 +55,7 @@ local processor = sam.Function('Processor', {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
     cfn.deploymentBucket
-    + cfn.iamRole(service, stage, processor.extraStatements)
+    + cfn.iamRole(service + '-' + stage, processor.extraStatements)
     + processor.resources
     + cfn.sqsQueue('OrderDLQ', tags=tags)
     + cfn.sqsQueue('OrderQueue',

@@ -10,7 +10,7 @@
 //     AWSTemplateFormatVersion: '2010-09-09',
 //     Resources:
 //       cfn.deploymentBucket
-//       + cfn.iamRole('my-service', 'dev', [...])
+//       + cfn.iamRole('my-service-dev', [...])
 //       + cfn.lambdaFn(logicalName='Handler', ...)
 //   }
 
@@ -88,7 +88,7 @@
   // ── IAM Execution Role ─────────────────────────────────────────────────────
   // Shared by all Lambda functions in a service. Base log permissions are
   // always included; pass extra statements for service-specific access.
-  iamRole(service, stage, extraStatements=[], managedPolicies=[]):: {
+  iamRole(namePrefix, extraStatements=[], managedPolicies=[]):: {
     IamRoleLambdaExecution: {
       Type: 'AWS::IAM::Role',
       Properties: {
@@ -101,25 +101,25 @@
           }],
         },
         Policies: [{
-          PolicyName: { 'Fn::Join': ['-', [service, stage, 'lambda']] },
+          PolicyName: namePrefix + '-lambda',
           PolicyDocument: {
             Version: '2012-10-17',
             Statement: [
               {
                 Effect: 'Allow',
                 Action: ['logs:CreateLogStream', 'logs:CreateLogGroup', 'logs:TagResource'],
-                Resource: [{ 'Fn::Sub': 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/' + service + '-' + stage + '*:*' }],
+                Resource: [{ 'Fn::Sub': 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/' + namePrefix + '*:*' }],
               },
               {
                 Effect: 'Allow',
                 Action: ['logs:PutLogEvents'],
-                Resource: [{ 'Fn::Sub': 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/' + service + '-' + stage + '*:*:*' }],
+                Resource: [{ 'Fn::Sub': 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/' + namePrefix + '*:*:*' }],
               },
             ] + extraStatements,
           },
         }],
         Path: '/',
-        RoleName: { 'Fn::Join': ['-', [service, stage, { Ref: 'AWS::Region' }, 'lambdaRole']] },
+        RoleName: { 'Fn::Join': ['-', [namePrefix, { Ref: 'AWS::Region' }, 'lambdaRole']] },
       } + (if managedPolicies != [] then { ManagedPolicyArns: managedPolicies } else {}),
     },
   },

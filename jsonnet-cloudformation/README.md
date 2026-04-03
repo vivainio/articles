@@ -230,7 +230,7 @@ local cfn = import 'lib/cfn.libsonnet';
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
     cfn.deploymentBucket
-    + cfn.iamRole('my-service', 'dev', [...])
+    + cfn.iamRole('my-service-dev', [...])
     + cfn.lambdaFn(logicalName='Worker', functionName='my-service-dev-worker', ...)
     + cfn.scheduleEvent('Worker', 'cron(0 3 * * ? *)'),
 }
@@ -550,7 +550,7 @@ local api = sam.Api('MyApi', {
 {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
-    cfn.iamRole('my-service', 'dev', fn.extraStatements)
+    cfn.iamRole('my-service-dev', fn.extraStatements)
     + fn.resources     // LogGroup + Function + Version
     + api.resources,   // RestApi + Resources + Methods + CORS + Deployment
 }

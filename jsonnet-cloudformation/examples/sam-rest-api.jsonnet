@@ -82,7 +82,7 @@ local api = sam.Api('TodoApi', {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
     cfn.deploymentBucket
-    + cfn.iamRole(service, stage, apiHandler.extraStatements)
+    + cfn.iamRole(service + '-' + stage, apiHandler.extraStatements)
     + apiHandler.resources
     + api.resources,
   Outputs: {
