@@ -15,7 +15,7 @@
   sqsSend: ['sqs:SendMessage', 'sqs:GetQueueUrl'],
 
   // ── S3 ────────────────────────────────────────────────────────────────────
-  s3Read: ['s3:GetObject', 's3:HeadObject'],
+  s3Read: ['s3:GetObject'],
   s3Write: ['s3:PutObject', 's3:DeleteObject'],
   s3List: ['s3:ListBucket'],
 

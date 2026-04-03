@@ -67,7 +67,7 @@ local tags = cfn.tags({
 
     + {
       // SQS event source mapping (from `events: - sqs:`)
-      ProcessorEventSourceMapping: sls.sqsEventSource('ProcessorLambdaFunction', 'OrderQueue', batchSize=10),
+      ProcessorEventSourceMapping: sls.sqsEventSource('ProcessorLambdaFunction', cfn.getAtt('OrderQueue', 'Arn'), batchSize=10),
 
       // Dead-letter queue
       OrderDLQ: sls.sqsQueue(tags=tags),

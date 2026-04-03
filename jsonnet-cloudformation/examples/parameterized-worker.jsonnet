@@ -38,9 +38,6 @@ local service = 'data-processor';
       '/data-processor/db-password',
       description='Database password from SSM Parameter Store',
     ),
-    NotificationEmail: cfn.param(
-      description='Email for alarm notifications',
-    ),
   },
 
   Resources:

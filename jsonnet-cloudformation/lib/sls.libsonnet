@@ -207,13 +207,13 @@
 
 
   // ── SQS Event Source ───────────────────────────────────────────────────────
-  // Returns a single resource value.
-  sqsEventSource(functionLogical, queueLogical, batchSize=10):: {
+  // Returns a single resource value. queueArn is the ARN (string or intrinsic).
+  sqsEventSource(functionLogical, queueArn, batchSize=10):: {
     Type: 'AWS::Lambda::EventSourceMapping',
     DependsOn: 'IamRoleLambdaExecution',
     Properties: {
       BatchSize: batchSize,
-      EventSourceArn: { 'Fn::GetAtt': [queueLogical, 'Arn'] },
+      EventSourceArn: queueArn,
       FunctionName: { 'Fn::GetAtt': [functionLogical, 'Arn'] },
       Enabled: 'True',
     },
@@ -401,7 +401,6 @@
                            AuthorizationType: 'JWT',
                            AuthorizerId: r.authorizerId,
                          } else {}),
-          DependsOn: integrationLogical,
         },
       },
       routes,
