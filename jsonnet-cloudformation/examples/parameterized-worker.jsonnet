@@ -50,24 +50,23 @@ local service = 'data-processor';
     ], managedPolicies=[
       'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',
     ])
-    + sls.lambdaFnG(
-      logicalName='Processor',
-      functionName=service + '-processor',
-      handler='src/processor.handler',
-      s3Key='serverless/' + service + '/package.zip',
-      runtime='python3.12',
-      memory=1024,
-      timeout=300,
-      env={
+    + sls.lambdaFnG('Processor', {
+      FunctionName: service + '-processor',
+      Handler: 'src/processor.handler',
+      Code: { S3Key: 'serverless/' + service + '/package.zip' },
+      Runtime: 'python3.12',
+      MemorySize: 1024,
+      Timeout: 300,
+      Environment: { Variables: {
         DB_PASSWORD: cfn.ref('DbPassword'),
         STAGE: cfn.ref('Stage'),
         BUCKET: cfn.sub('${Stage}-data-bucket'),
-      },
-      vpcConfig={
+      } },
+      VpcConfig: {
         SecurityGroupIds: [cfn.ref('LambdaSG')],
         SubnetIds: cfn.ref('SubnetIds'),
       },
-    )
+    })
     + sls.scheduleEventG('Processor', 'rate(1 hour)')
     + {
       // Security group — pass-through as raw Jsonnet

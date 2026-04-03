@@ -64,14 +64,13 @@ local methods = [
     ])
 
     // Single Lambda function serving all routes
-    + sls.lambdaFnG(
-      logicalName='Api',
-      functionName=service + '-' + stage + '-api',
-      handler='wsgi_handler.handler',
-      s3Key='serverless/' + service + '/' + stage + '/package.zip',
-      env={ STAGE: stage },
-      tags=tags,
-    )
+    + sls.lambdaFnG('Api', {
+      FunctionName: service + '-' + stage + '-api',
+      Handler: 'wsgi_handler.handler',
+      Code: { S3Key: 'serverless/' + service + '/' + stage + '/package.zip' },
+      Environment: { Variables: { STAGE: stage } },
+      Tags: tags,
+    })
 
     // REST API
     + sls.restApiG(stage + '-' + service)

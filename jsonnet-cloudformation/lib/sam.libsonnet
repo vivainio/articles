@@ -171,21 +171,20 @@ local sls = import 'sls.libsonnet';
 
     {
       resources:
-        sls.lambdaFnG(
-          logicalName=logicalName,
-          functionName=functionName,
-          handler=handler,
-          s3Key=code.key,
-          runtime=runtime,
-          memory=memory,
-          timeout=timeout,
-          env=env,
-          tags=tags,
-          vpcConfig=vpcConfig,
-          reservedConcurrency=reservedConc,
-          logDestination=logDest,
-          s3Bucket=code.bucket,
-        )
+        sls.lambdaFnG(logicalName, {
+          FunctionName: functionName,
+          Handler: handler,
+          Runtime: runtime,
+          MemorySize: memory,
+          Timeout: timeout,
+          Code: { S3Key: code.key }
+                + (if code.bucket != null then { S3Bucket: code.bucket } else {}),
+        }
+        + (if env != {} then { Environment: { Variables: env } } else {})
+        + (if tags != [] then { Tags: tags } else {})
+        + (if vpcConfig != null then { VpcConfig: vpcConfig } else {})
+        + (if reservedConc != null then { ReservedConcurrentExecutions: reservedConc } else {}),
+        logDestination=logDest)
         + eventResources,
 
       extraStatements: extraStatements,

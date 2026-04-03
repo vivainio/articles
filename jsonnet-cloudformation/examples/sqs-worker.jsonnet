@@ -53,18 +53,17 @@ local tags = cfn.tags({
     ])
 
     // Lambda consumer — limited to 5 concurrent executions
-    + sls.lambdaFnG(
-      logicalName='Processor',
-      functionName=service + '-' + stage + '-processor',
-      handler='src/processor.handler',
-      s3Key='serverless/' + service + '/' + stage + '/package.zip',
-      runtime='nodejs20.x',
-      memory=256,
-      timeout=30,
-      env={ STAGE: stage, TABLE_NAME: 'orders-' + stage },
-      tags=tags,
-      reservedConcurrency=5,
-    )
+    + sls.lambdaFnG('Processor', {
+      FunctionName: service + '-' + stage + '-processor',
+      Handler: 'src/processor.handler',
+      Code: { S3Key: 'serverless/' + service + '/' + stage + '/package.zip' },
+      Runtime: 'nodejs20.x',
+      MemorySize: 256,
+      Timeout: 30,
+      Environment: { Variables: { STAGE: stage, TABLE_NAME: 'orders-' + stage } },
+      Tags: tags,
+      ReservedConcurrentExecutions: 5,
+    })
 
     + {
       // SQS event source mapping (from `events: - sqs:`)

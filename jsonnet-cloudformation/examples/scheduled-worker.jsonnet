@@ -39,16 +39,15 @@ local tags = cfn.tags({ Service: service, Stage: stage });
     + sls.iamRoleG(service + '-' + stage, [
       cfn.allow(['ec2:DescribeSnapshots', 'ec2:DeleteSnapshot'], '*'),
     ])
-    + sls.lambdaFnG(
-      logicalName='Worker',
-      functionName=service + '-' + stage + '-worker',
-      handler='handler.cleanup',
-      s3Key='serverless/' + service + '/' + stage + '/package.zip',
-      runtime='python3.12',
-      memory=512,
-      timeout=600,
-      tags=tags,
-    )
+    + sls.lambdaFnG('Worker', {
+      FunctionName: service + '-' + stage + '-worker',
+      Handler: 'handler.cleanup',
+      Code: { S3Key: 'serverless/' + service + '/' + stage + '/package.zip' },
+      Runtime: 'python3.12',
+      MemorySize: 512,
+      Timeout: 600,
+      Tags: tags,
+    })
     + sls.scheduleEventG('Worker', 'cron(0 3 * * ? *)', enabled=true),
 
   Outputs: {

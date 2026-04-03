@@ -47,14 +47,13 @@ local authRef = cfn.ref(authorizerLogical);
     ])
 
     // Lambda function
-    + sls.lambdaFnG(
-      logicalName='Api',
-      functionName=service + '-' + stage + '-api',
-      handler='app.handler',
-      s3Key='serverless/' + service + '/' + stage + '/package.zip',
-      env={ STAGE: stage, TABLE_NAME: 'users-' + stage },
-      tags=tags,
-    )
+    + sls.lambdaFnG('Api', {
+      FunctionName: service + '-' + stage + '-api',
+      Handler: 'app.handler',
+      Code: { S3Key: 'serverless/' + service + '/' + stage + '/package.zip' },
+      Environment: { Variables: { STAGE: stage, TABLE_NAME: 'users-' + stage } },
+      Tags: tags,
+    })
 
     // HTTP API + auto-deploy stage
     + sls.httpApiG(stage + '-' + service)

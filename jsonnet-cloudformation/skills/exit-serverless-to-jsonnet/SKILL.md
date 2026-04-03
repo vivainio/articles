@@ -164,7 +164,7 @@ The prefix is the PascalCased function key from serverless.yml. SLS replaced
 - `api_handler` → `ApiUnderscorehandler`
 - `my-service` → `MyDashservice`
 
-**Replace with:** `sls.lambdaFnG(logicalName='{Prefix}', ...)`
+**Replace with:** `sls.lambdaFnG('{Prefix}', ...)`
 
 Optional fourth resource if log forwarding was configured:
 ```

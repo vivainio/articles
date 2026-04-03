@@ -232,7 +232,7 @@ local sls = import 'lib/sls.libsonnet';
   Resources:
     sls.deploymentBucketG
     + sls.iamRoleG('my-service-dev', [...])
-    + sls.lambdaFnG(logicalName='Worker', functionName='my-service-dev-worker', ...)
+    + sls.lambdaFnG('Worker', { FunctionName: 'my-service-dev-worker', Handler: '...', ... })
     + sls.scheduleEventG('Worker', 'cron(0 3 * * ? *)'),
 }
 ```
@@ -357,7 +357,7 @@ it auto-generates the API Gateway resource tree from event declarations.
 Every helper is a Jsonnet function that returns a plain object:
 
 ```jsonnet
-lambdaFnG(logicalName='Worker', functionName='svc-dev-worker', handler='h.main', ...)
+lambdaFnG('Worker', { FunctionName: 'svc-dev-worker', Handler: 'h.main', ... })
 // returns:
 // {
 //   WorkerLogGroup: { Type: 'AWS::Logs::LogGroup', ... },
@@ -406,7 +406,7 @@ local standardTags(service, stage) = {
 };
 
 // Apply to every resource that supports tags:
-lambdaFnG(logicalName, functionName, handler, ..., tags=standardTags(service, stage))
+lambdaFnG('Handler', { ..., Tags: standardTags(service, stage) })
 ```
 
 Another example: CloudFormation intrinsic functions like `Fn::GetAtt` and
@@ -456,7 +456,7 @@ Services compose it with `+`, just like any other resource block:
 local co = import 'lib/company.libsonnet';
 
 Resources:
-  sls.lambdaFnG(logicalName='Worker', functionName=fnName, ...)
+  sls.lambdaFnG('Worker', { FunctionName: fnName, Handler: '...', ... })
   + co.logForwarding('Worker', fnName, firehoseArn, logRoleArn)
   + sls.scheduleEventG('Worker', 'cron(0 3 * * ? *)'),
 ```

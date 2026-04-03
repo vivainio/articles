@@ -20,7 +20,7 @@
 //     Resources:
 //       sls.deploymentBucketG
 //       + sls.iamRoleG('my-service-dev', [...])
-//       + sls.lambdaFnG(logicalName='Handler', ...)
+//       + sls.lambdaFnG('Handler', { FunctionName: '...', Handler: '...', ... })
 //       + sls.scheduleEventG('Handler', 'rate(1 hour)')
 //       + {
 //         MyQueue: sls.sqsQueue(tags=tags),
@@ -105,28 +105,32 @@
   // ── Lambda Function (G = group) ──────────────────────────────────────────
   // Expands to: LogGroup + Lambda::Function + Lambda::Version.
   // Optionally: Logs::SubscriptionFilter (when logDestination is set).
-  lambdaFnG(
-    logicalName,
-    functionName,
-    handler,
-    s3Key,
-    codeSha256='',
-    runtime='python3.12',
-    memory=128,
-    timeout=300,
-    role='IamRoleLambdaExecution',
-    env={},
-    tags=[],
-    vpcConfig=null,
-    reservedConcurrency=null,
-    s3Bucket=null,
-    logDestination=null,
-  )::
+  //
+  // props is the AWS::Lambda::Function Properties object. Defaults applied:
+  //   Runtime: python3.12, MemorySize: 128, Timeout: 300,
+  //   Role: IamRoleLambdaExecution, Code.S3Bucket: ServerlessDeploymentBucket.
+  lambdaFnG(logicalName, props, logDestination=null)::
     local lg  = logicalName + 'LogGroup';
     local fn  = logicalName + 'LambdaFunction';
     local ver = logicalName + 'LambdaVersion';
     local sub = logicalName + 'LogSubscriptionFilter';
-    local bucket = if s3Bucket != null then s3Bucket else { Ref: 'ServerlessDeploymentBucket' };
+    local functionName = props.FunctionName;
+
+    // Default Code.S3Bucket if Code has S3Key but no S3Bucket
+    local code =
+      if std.objectHas(props, 'Code') then
+        { S3Bucket: { Ref: 'ServerlessDeploymentBucket' } } + props.Code
+      else {};
+
+    local defaults = {
+      Runtime: 'python3.12',
+      MemorySize: 128,
+      Timeout: 300,
+      Role: { 'Fn::GetAtt': ['IamRoleLambdaExecution', 'Arn'] },
+    };
+
+    local merged = defaults + props + (if code != {} then { Code: code } else {});
+
     {
       [lg]: {
         Type: 'AWS::Logs::LogGroup',
@@ -134,19 +138,7 @@
       },
       [fn]: {
         Type: 'AWS::Lambda::Function',
-        Properties: {
-          Code: { S3Bucket: bucket, S3Key: s3Key },
-          FunctionName: functionName,
-          Handler: handler,
-          Runtime: runtime,
-          MemorySize: memory,
-          Timeout: timeout,
-          Role: { 'Fn::GetAtt': [role, 'Arn'] },
-        }
-        + (if env != {} then { Environment: { Variables: env } } else {})
-        + (if tags != [] then { Tags: tags } else {})
-        + (if vpcConfig != null then { VpcConfig: vpcConfig } else {})
-        + (if reservedConcurrency != null then { ReservedConcurrentExecutions: reservedConcurrency } else {}),
+        Properties: merged,
         DependsOn: [lg],
       },
       [ver]: {
@@ -154,7 +146,6 @@
         DeletionPolicy: 'Retain',
         Properties: {
           FunctionName: { Ref: fn },
-          CodeSha256: codeSha256,
         },
       },
     }
