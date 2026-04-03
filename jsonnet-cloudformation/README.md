@@ -378,12 +378,46 @@ Resource: [{ 'Fn::GetAtt': ['OrderQueue', 'Arn'] }],
 Resource: [cfn.getAtt('OrderQueue', 'Arn')],
 ```
 
-You can also write functions that compose multiple helpers into a
-higher-level unit — a "microservice" function that bundles a Lambda, its
-log group, an alarm, and a dashboard widget into a single call. The difference
-from CDK is that these abstractions are pure data transformations, not classes
-with side effects. You can print the output, diff it, and reason about it
-without running anything.
+A more realistic example: your company wants every Lambda's CloudWatch logs
+forwarded to a central Kinesis Data Firehose for log aggregation. Instead of
+copy-pasting the subscription filter into every service, you put the pattern in
+a shared library as a mixin that you merge alongside the Lambda:
+
+```jsonnet
+// lib/company.libsonnet — shared abstractions across all services
+{
+  // Returns a SubscriptionFilter resource that forwards a Lambda's logs
+  // to the central Firehose. Merge with `+` next to cfn.lambdaFn().
+  logForwarding(logicalName, functionName, firehoseArn, roleArn):: {
+    [logicalName + 'LogSubscription']: {
+      Type: 'AWS::Logs::SubscriptionFilter',
+      DependsOn: logicalName + 'LogGroup',
+      Properties: {
+        LogGroupName: '/aws/lambda/' + functionName,
+        FilterPattern: '',
+        DestinationArn: firehoseArn,
+        RoleArn: roleArn,
+      },
+    },
+  },
+}
+```
+
+Services compose it with `+`, just like any other resource block:
+
+```jsonnet
+local co = import 'lib/company.libsonnet';
+
+Resources:
+  cfn.lambdaFn(logicalName='Worker', functionName=fnName, ...)
+  + co.logForwarding('Worker', fnName, firehoseArn, logRoleArn)
+  + cfn.scheduleEvent('Worker', 'cron(0 3 * * ? *)'),
+```
+
+No wrapping, no override — `cfn.lambdaFn` stays untouched and the mixin is
+just another object merged in. This is the same pattern CDK teams achieve with
+custom constructs, but the abstraction is a pure data transformation: you can
+print the output, diff it, and reason about it without running anything.
 
 ## Replacing SAM with sam.libsonnet
 
