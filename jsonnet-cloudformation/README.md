@@ -487,3 +487,7 @@ scale. Any loss of resources or data resulting from deploying these templates is
 your responsibility. Always review the CloudFormation changeset before deploying
 — `aws cloudformation deploy` shows the diff, and you should read every line of
 it before confirming.
+
+**AI-authored content.** All prose, library code, and examples in this
+repository were authored by Claude Opus 4.6 and reviewed by a (presumed)
+human.
