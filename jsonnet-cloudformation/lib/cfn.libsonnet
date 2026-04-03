@@ -56,6 +56,28 @@
     } + (if description != null then { Description: description } else {}),
   },
 
+  // ── Conditions ─────────────────────────────────────────────────────────────
+  // Build a condition object that carries its definition and can annotate
+  // resources or property values.
+  //
+  //   local hasPart = cfn.condition('HasPartner', cfn.notEquals(cfn.ref('P'), ''));
+  //
+  //   Conditions: hasPart.def,                       // { HasPartner: ... }
+  //   Resources: { R: { ... } + hasPart.on },        // adds Condition: 'HasPartner'
+  //   Value: hasPart.then('yes', cfn.ref('Default')) // Fn::If
+  condition(name, expr):: {
+    def: { [name]: expr },
+    on: { Condition: name },
+    pick(t, f):: { 'Fn::If': [name, t, f] },
+  },
+
+  // Condition expression helpers
+  equals(a, b):: { 'Fn::Equals': [a, b] },
+  notEquals(a, b):: { 'Fn::Not': [$.equals(a, b)] },
+  condAnd(conds):: { 'Fn::And': conds },
+  condOr(conds):: { 'Fn::Or': conds },
+  condNot(cond):: { 'Fn::Not': [cond] },
+
   // ── Tags ───────────────────────────────────────────────────────────────────
   // Convert { Key: Value } object to CFN Tags array format.
   tags(obj):: [{ Key: k, Value: obj[k] } for k in std.objectFields(obj)],
