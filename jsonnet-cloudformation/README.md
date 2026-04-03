@@ -48,9 +48,12 @@ you have large, complex infrastructure with dozens of interdependent resources
 queues), it's overkill.
 
 **Terraform** is a legitimate option but means adopting an entirely new state
-management model, HCL syntax, and provider versioning. If your infrastructure
-is already CloudFormation, switching to Terraform is a bigger migration than
-the problem you're solving.
+management model, HCL syntax, and provider versioning. Terraform also [switched
+to the Business Source
+License](https://www.hashicorp.com/en/blog/hashicorp-adopts-business-source-license)
+in 2023, so you'd be trading one licensing problem for another. If your
+infrastructure is already CloudFormation, switching to Terraform is a bigger
+migration than the problem you're solving.
 
 ### What we actually need
 
