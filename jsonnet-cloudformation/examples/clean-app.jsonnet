@@ -29,19 +29,8 @@ local bucket = service + '-' + stage + '-data';
         cfn.allow(actions.s3Read + actions.s3Write, 'arn:aws:s3:::' + bucket + '/*'),
         cfn.allow(actions.s3List, 'arn:aws:s3:::' + bucket),
       ]),
-      DataTable: {
-        Type: 'AWS::DynamoDB::Table',
-        Properties: {
-          TableName: table,
-          BillingMode: 'PAY_PER_REQUEST',
-          AttributeDefinitions: [{ AttributeName: 'id', AttributeType: 'S' }],
-          KeySchema: [{ AttributeName: 'id', KeyType: 'HASH' }],
-        },
-      },
-      DataBucket: {
-        Type: 'AWS::S3::Bucket',
-        Properties: { BucketName: bucket },
-      },
+      DataTable: aws.table(table, 'id'),
+      DataBucket: aws.bucket(bucket),
     },
 
   Outputs: {

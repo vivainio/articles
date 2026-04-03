@@ -91,6 +91,43 @@ local cfn = import 'cfn.libsonnet';
   },
 
 
+  // ── DynamoDB table (on-demand) ─────────────────────────────────────────
+  // Returns a single resource value. PAY_PER_REQUEST, key type defaults to S.
+  //   DataTable: aws.table('my-table', 'id')
+  //   DataTable: aws.table('my-table', 'pk', 'sk')
+  table(name, hashKey, rangeKey=null, hashType='S', rangeType='S')::
+    local hashAttr = { AttributeName: hashKey, AttributeType: hashType };
+    local rangeAttr = { AttributeName: rangeKey, AttributeType: rangeType };
+    {
+      Type: 'AWS::DynamoDB::Table',
+      Properties: {
+        TableName: name,
+        BillingMode: 'PAY_PER_REQUEST',
+        AttributeDefinitions:
+          [hashAttr] + (if rangeKey != null then [rangeAttr] else []),
+        KeySchema:
+          [{ AttributeName: hashKey, KeyType: 'HASH' }]
+          + (if rangeKey != null then [{ AttributeName: rangeKey, KeyType: 'RANGE' }] else []),
+      },
+    },
+
+
+  // ── S3 bucket ────────────────────────────────────────────────────────────
+  // Returns a single resource value. AES256 encryption by default.
+  //   DataBucket: aws.bucket('my-bucket')
+  bucket(name):: {
+    Type: 'AWS::S3::Bucket',
+    Properties: {
+      BucketName: name,
+      BucketEncryption: {
+        ServerSideEncryptionConfiguration: [{
+          ServerSideEncryptionByDefault: { SSEAlgorithm: 'AES256' },
+        }],
+      },
+    },
+  },
+
+
   // ── Schedule event (G) ───────────────────────────────────────────────────
   // Expands to: {prefix}Rule + {prefix}Permission.
   scheduleG(prefix, functionLogical, schedule, enabled=true):: {
