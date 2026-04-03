@@ -6,13 +6,17 @@
 //
 // Usage:
 //   local cfn = import 'lib/cfn.libsonnet';
-//   cfn.allow(actions.ddbRead, cfn.sub('arn:aws:dynamodb:${AWS::Region}:...'))
+//   cfn.allow(actions.ddbRead, cfn.arn('dynamodb', 'table/my-table-dev'))
 
 {
   // ── Intrinsic function shorthands ─────────────────────────────────────────
   getAtt(logical, attr):: { 'Fn::GetAtt': [logical, attr] },
   sub(str):: { 'Fn::Sub': str },
   ref(logical):: { Ref: logical },
+
+  // ── ARN builder ────────────────────────────────────────────────────────────
+  // Same-account, same-region ARN. Expands partition, region, and account ID.
+  arn(service, resource):: { 'Fn::Sub': 'arn:${AWS::Partition}:' + service + ':${AWS::Region}:${AWS::AccountId}:' + resource },
 
   // ── IAM policy shorthands ──────────────────────────────────────────────────
   allow(actions, resource, condition=null)::

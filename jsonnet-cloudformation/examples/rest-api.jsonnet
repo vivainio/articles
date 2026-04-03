@@ -60,7 +60,7 @@ local methods = [
   Resources:
     sls.deploymentBucketG
     + sls.iamRoleG(service + '-' + stage, [
-      cfn.allow(actions.ddbRead + actions.ddbWrite, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-*')),
+      cfn.allow(actions.ddbRead + actions.ddbWrite, cfn.arn('dynamodb', 'table/todos-*')),
     ])
 
     // Single Lambda function serving all routes

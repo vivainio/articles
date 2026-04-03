@@ -49,7 +49,7 @@ local tags = cfn.tags({
     sls.deploymentBucketG
     + sls.iamRoleG(service + '-' + stage, [
       cfn.allow(actions.sqsConsume, [cfn.getAtt('OrderQueue', 'Arn')]),
-      cfn.allow(actions.ddbWrite, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage)),
+      cfn.allow(actions.ddbWrite, cfn.arn('dynamodb', 'table/orders-' + stage)),
     ])
 
     // Lambda consumer — limited to 5 concurrent executions

@@ -43,7 +43,7 @@ local authRef = cfn.ref(authorizerLogical);
   Resources:
     sls.deploymentBucketG
     + sls.iamRoleG(service + '-' + stage, [
-      cfn.allow(actions.ddbAll, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
+      cfn.allow(actions.ddbAll, cfn.arn('dynamodb', 'table/users-' + stage)),
     ])
 
     // Lambda function
