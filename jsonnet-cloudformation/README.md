@@ -480,8 +480,9 @@ magic strings that would otherwise be scattered across templates:
 }
 ```
 
-Every service imports the same file, and when an account number or ARN changes,
-you update it in one place.
+Every service imports the same file. Account numbers never change, but
+`constants.accounts.prod` is easier to review in a PR than a bare
+12-digit number — and you can't typo it.
 
 ## Replacing SAM with sam.libsonnet
 
