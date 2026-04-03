@@ -44,9 +44,11 @@ local logDest = cfn.ref('LogDestinationArn');
       // Forward Lambda logs to central logging
       AppLogForward: aws.logSubscription('/aws/lambda/' + service + '-' + stage + '-app', logDest),
 
-      // Cross-account role: partner can invoke our Lambda
-      PartnerInvokerRole: aws.assumableRole([partner], [
+      // Cross-account role: partner can invoke Lambda and read bucket
+      PartnerRole: aws.assumableRole([partner], [
         cfn.allow(actions.lambdaInvoke, cfn.getArn('AppFunction')),
+        cfn.allow(actions.s3Read, 'arn:aws:s3:::' + bucket + '/*'),
+        cfn.allow(actions.s3List, 'arn:aws:s3:::' + bucket),
       ]),
     },
 
