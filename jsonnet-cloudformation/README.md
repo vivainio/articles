@@ -296,6 +296,15 @@ cross-stack export. Demonstrates `cfn.param()`, `cfn.ssmParam()`, and
 
 → [`examples/parameterized-worker.jsonnet`](examples/parameterized-worker.jsonnet)
 
+### 6. Clean-room stack (~50 lines → 10 resources)
+
+A production-shaped stack built with `aws.libsonnet` — no Serverless Framework
+conventions, no fixed logical IDs. Lambda + DynamoDB table + S3 bucket + IAM
+role + cross-account invoker role + log forwarding to Kinesis + SSM parameter
+exports. Every resource name is explicit and visible in the source.
+
+→ [`examples/clean-app.jsonnet`](examples/clean-app.jsonnet)
+
 ## Multi-stage from a single file
 
 Every example accepts `stage` as an external variable:
@@ -621,22 +630,28 @@ examples, but with SAM-style input:
 | `Events: { Type: Api }` | Collected, expanded by `Api()` | Method + CORS OPTIONS + Permission |
 | `Events: { Type: HttpApi }` | Collected, expanded by `HttpApi()` | Route + Integration + Permission |
 
-### Two layers, one output
+### Libraries
 
-The three libraries complement each other:
+Four libraries, pick the level that fits:
 
 - **`cfn.libsonnet`** — general-purpose CloudFormation helpers: intrinsic
-  function shorthands (`getAtt`, `sub`, `ref`), IAM policy builders (`allow`,
-  `deny`, `policies`), parameter and output helpers, and tag conversion.
-- **`sls.libsonnet`** — serverless resource builders, one per CFN resource
-  pattern: `lambdaFnG`, `iamRole`, `deploymentBucket`, API Gateway, SQS, and
-  schedule event wiring. You wire resources together explicitly. Maximum control.
+  function shorthands (`getAtt`, `getArn`, `sub`, `ref`, `arn`), IAM policy
+  builders (`allow`, `deny`, `policies`), parameter and output helpers,
+  SSM parameter exports, and tag conversion.
+- **`aws.libsonnet`** — clean-room resource helpers with no SLS/SAM
+  conventions: `lambdaG`, `lambdaRole`, `serviceRole`, `assumableRole`,
+  `table`, `bucket`, `logSubscription`, `scheduleG`. No fixed logical IDs —
+  you pick every resource name.
+- **`sls.libsonnet`** — serverless resource builders that match Serverless
+  Framework naming: `lambdaFnG`, `iamRoleG`, `deploymentBucketG`, API Gateway,
+  SQS, and schedule event wiring. Use for migrating existing SLS stacks in-place.
 - **`sam.libsonnet`** — high-level SAM-shaped interface. Events are declared
   inline, API resource trees are generated automatically. Calls `sls.libsonnet`
   under the hood.
 
-Both produce the same plain CloudFormation JSON. Choose based on how much
-automation you want vs. how much control you need.
+For new projects, start with `cfn` + `aws`. For migrating existing Serverless
+Framework stacks, use `cfn` + `sls` (or `sam`) to preserve logical IDs.
+All produce the same plain CloudFormation JSON.
 
 ## Trade-offs
 
