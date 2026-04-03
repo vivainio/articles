@@ -444,6 +444,10 @@ can run `sam build` to preview, but in production you're trusting the
 transform. When something goes wrong, you're debugging resources you didn't
 declare.
 
+SAM also doesn't support custom abstractions — there's no way to define
+reusable patterns like the company-wide log forwarding mixin shown earlier.
+You get the built-in resource types and nothing else.
+
 `sam.libsonnet` performs the same expansion at build time. The developer writes
 SAM-shaped input, but the output is plain CloudFormation — no `Transform:`
 header, no deploy-time surprises.
