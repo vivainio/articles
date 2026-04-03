@@ -56,7 +56,7 @@ local myApp = aws.lambda('MyApp', {
       BucketNameParam: cfn.ssmOutput('/' + service + '/' + stage + '/bucket-name', cfn.ref('DataBucket')),
 
       // Forward Lambda logs to central logging
-      MyAppLogForward: aws.logSubscription('/aws/lambda/' + service + '-' + stage + '-app', logDest),
+      MyAppLogForward: myApp.logSubscription(logDest),
 
       // Cross-account role: partner can invoke Lambda and read bucket
       PartnerRole: aws.assumableRole([partner], [

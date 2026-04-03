@@ -34,12 +34,15 @@ local cfn = import 'cfn.libsonnet';
   lambdaG(prefix, props):: $.lambda(prefix, props).resources,
 
   // ── Lambda builder ─────────────────────────────────────────────────────
-  // Returns { resources, fn, logGroup, version, routes(apiLogical, routes) }.
+  // Returns { resources, fn, logGroup, version,
+  //           routes(), schedule(), sqsSource(), logSubscription() }.
   // Use .resources to merge with +, .fn to reference the function logical ID.
   //
   //   local myApp = aws.lambda('MyApp', { FunctionName: '...', ... });
   //   myApp.resources
   //   + myApp.routes('MyApi', { Default: { routeKey: '$default' } })
+  //   + myApp.schedule('Nightly', 'cron(0 3 * * ? *)')
+  //   + { QueueSrc: myApp.sqsSource('MyQueue'), LogFwd: myApp.logSubscription(destArn) }
   lambda(prefix, props)::
     local functionName = props.FunctionName;
     local fnLogical = prefix + 'Function';
@@ -115,6 +118,51 @@ local cfn = import 'cfn.libsonnet';
             },
           },
         },
+
+      // CloudWatch schedule → this function. Returns {prefix}Rule + {prefix}Permission.
+      schedule(schedulePrefix, scheduleExpr, enabled=true):: {
+        [schedulePrefix + 'Rule']: {
+          Type: 'AWS::Events::Rule',
+          Properties: {
+            ScheduleExpression: scheduleExpr,
+            State: if enabled then 'ENABLED' else 'DISABLED',
+            Targets: [{
+              Arn: cfn.getArn(fnLogical),
+              Id: schedulePrefix + 'Target',
+            }],
+          },
+        },
+        [schedulePrefix + 'Permission']: {
+          Type: 'AWS::Lambda::Permission',
+          Properties: {
+            FunctionName: cfn.getArn(fnLogical),
+            Action: 'lambda:InvokeFunction',
+            Principal: 'events.amazonaws.com',
+            SourceArn: cfn.getArn(schedulePrefix + 'Rule'),
+          },
+        },
+      },
+
+      // SQS event source mapping → this function. Returns a single resource value.
+      sqsSource(queueLogical, batchSize=10):: {
+        Type: 'AWS::Lambda::EventSourceMapping',
+        Properties: {
+          BatchSize: batchSize,
+          EventSourceArn: cfn.getArn(queueLogical),
+          FunctionName: cfn.getArn(fnLogical),
+          Enabled: true,
+        },
+      },
+
+      // Log subscription for this function's log group. Returns a single resource value.
+      logSubscription(destinationArn):: {
+        Type: 'AWS::Logs::SubscriptionFilter',
+        Properties: {
+          LogGroupName: '/aws/lambda/' + functionName,
+          DestinationArn: destinationArn,
+          FilterPattern: '',
+        },
+      },
     },
 
 
