@@ -37,7 +37,8 @@ local logDest = cfn.ref('LogDestinationArn');
     + aws.httpApiG('MyApi', service + '-' + stage)
     + { MyApiAuth: aws.jwtAuthorizer('MyApi', 'jwt', cfn.ref('JwtIssuer'), [cfn.ref('JwtAudience')]) }
     + aws.httpApiRouteG('AppDefault', 'MyApi', 'AppFunction', '$default', authorizerId=cfn.ref('MyApiAuth'))
-    + aws.httpApiRouteG('AppLogin', 'MyApi', 'AppFunction', 'POST /login')
+    + aws.httpApiRouteG('AppLoginGet', 'MyApi', 'AppFunction', 'GET /login')
+    + aws.httpApiRouteG('AppLoginPost', 'MyApi', 'AppFunction', 'POST /login')
 
     + {
       AppRole: aws.lambdaRole(service + '-' + stage, [
