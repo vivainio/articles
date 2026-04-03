@@ -28,7 +28,7 @@ new runtime support. (See also the [Hacker News
 discussion](https://news.ycombinator.com/item?id=43421598) on the license
 change.)
 
-If you have dozens of services in production, this means either paying per seat
+If you have dozens or even hundreds of services in production, this means either paying per seat
 for a build tool that wraps CloudFormation, or migrating. Most teams start
 evaluating alternatives at this point.
 
