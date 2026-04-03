@@ -12,7 +12,7 @@
 //   local sam = import 'lib/sam.libsonnet';
 //   local fn = sam.Function('Api', { Handler: 'app.handler', Events: {...} }, globals.Function);
 //   local api = sam.Api('MyApi', { StageName: 'dev' }, [fn], service='my-svc');
-//   { Resources: sls.iamRole(..., fn.extraStatements) + fn.resources + api.resources }
+//   { Resources: sls.iamRoleG(..., fn.extraStatements) + fn.resources + api.resources }
 
 local cfn = import 'cfn.libsonnet';
 local sls = import 'sls.libsonnet';
@@ -82,7 +82,7 @@ local sls = import 'sls.libsonnet';
   //
   // Returns an object with:
   //   .resources       — CFN resource map (merge into Resources with +)
-  //   .extraStatements — IAM statements extracted from Policies (pass to sls.iamRole)
+  //   .extraStatements — IAM statements extracted from Policies (pass to sls.iamRoleG)
   //   .apiEvents       — Api events for the Api expander to consume
   //   .httpApiEvents   — HttpApi events for the HttpApi expander to consume
   //   .functionLogical — logical ID of the Lambda::Function resource
@@ -306,7 +306,7 @@ local sls = import 'sls.libsonnet';
 
     {
       resources:
-        sls.restApi(apiName)
+        sls.restApiG(apiName)
         + resourceResources
         + methodResources
         + corsResources
@@ -392,7 +392,7 @@ local sls = import 'sls.libsonnet';
 
     {
       resources:
-        sls.httpApi(name)
+        sls.httpApiG(name)
         + authResources
         + fnResources,
     },

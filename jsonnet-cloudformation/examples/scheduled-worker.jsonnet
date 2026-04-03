@@ -35,8 +35,8 @@ local tags = cfn.tags({ Service: service, Stage: stage });
   AWSTemplateFormatVersion: '2010-09-09',
 
   Resources:
-    sls.deploymentBucket
-    + sls.iamRole(service + '-' + stage, [
+    sls.deploymentBucketG
+    + sls.iamRoleG(service + '-' + stage, [
       cfn.allow(['ec2:DescribeSnapshots', 'ec2:DeleteSnapshot'], '*'),
     ])
     + sls.lambdaFnG(

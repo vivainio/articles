@@ -44,8 +44,8 @@ local service = 'data-processor';
   },
 
   Resources:
-    sls.deploymentBucket
-    + sls.iamRole(service + '-dev', [
+    sls.deploymentBucketG
+    + sls.iamRoleG(service + '-dev', [
       cfn.allow(actions.s3Read + actions.s3Write, cfn.sub('arn:aws:s3:::${Stage}-data-bucket/*')),
     ], managedPolicies=[
       'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',

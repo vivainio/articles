@@ -4,23 +4,22 @@
 // auto-generate from high-level declarations.
 //
 // Naming convention:
-//   - Functions ending in G (lambdaFnG, scheduleEventG, httpApiFnG) return
-//     { LogicalId: Resource, ... } objects containing multiple resources.
+//   - Functions ending in G return { LogicalId: Resource, ... } objects.
 //     Merge them with `+`.
 //   - All other functions return a single resource value. Use as a value in
 //     a { LogicalId: sls.helper(...) } object — the logical ID is visible
 //     in your source, matching the CFN output.
-//   - deploymentBucket, iamRole, restApi, httpApi have fixed well-known keys
-//     and merge with `+`. These assume one per template, matching the SLS
-//     one-service-per-stack convention.
+//
+//   Fixed-key G helpers (deploymentBucketG, iamRoleG, restApiG, httpApiG)
+//   assume one per template, matching the SLS one-service-per-stack convention.
 //
 // Usage:
 //   local sls = import 'lib/sls.libsonnet';
 //   {
 //     AWSTemplateFormatVersion: '2010-09-09',
 //     Resources:
-//       sls.deploymentBucket
-//       + sls.iamRole('my-service-dev', [...])
+//       sls.deploymentBucketG
+//       + sls.iamRoleG('my-service-dev', [...])
 //       + sls.lambdaFnG(logicalName='Handler', ...)
 //       + sls.scheduleEventG('Handler', 'rate(1 hour)')
 //       + {
@@ -31,7 +30,7 @@
 {
   // ── Deployment Bucket ──────────────────────────────────────────────────────
   // S3 bucket + HTTPS-only policy. Present in every SLS-generated template.
-  deploymentBucket:: {
+  deploymentBucketG:: {
     ServerlessDeploymentBucket: {
       Type: 'AWS::S3::Bucket',
       Properties: {
@@ -66,7 +65,7 @@
   // ── IAM Execution Role ─────────────────────────────────────────────────────
   // Shared by all Lambda functions in a service. Base log permissions are
   // always included; pass extra statements for service-specific access.
-  iamRole(namePrefix, extraStatements=[], managedPolicies=[]):: {
+  iamRoleG(namePrefix, extraStatements=[], managedPolicies=[]):: {
     IamRoleLambdaExecution: {
       Type: 'AWS::IAM::Role',
       Properties: {
@@ -232,7 +231,7 @@
 
   // ── REST API (API Gateway v1) ──────────────────────────────────────────────
 
-  restApi(name, endpointType='EDGE'):: {
+  restApiG(name, endpointType='EDGE'):: {
     ApiGatewayRestApi: {
       Type: 'AWS::ApiGateway::RestApi',
       Properties: {
@@ -347,7 +346,7 @@
 
   // ── HTTP API (API Gateway v2) ──────────────────────────────────────────────
 
-  httpApi(name):: {
+  httpApiG(name):: {
     HttpApi: {
       Type: 'AWS::ApiGatewayV2::Api',
       Properties: { Name: name, ProtocolType: 'HTTP' },

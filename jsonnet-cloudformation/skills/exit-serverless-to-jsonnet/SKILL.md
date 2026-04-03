@@ -27,9 +27,9 @@ Read the template and classify every resource by pattern. Use this table:
 
 | CFN resource type | Count it as | Notes |
 |---|---|---|
-| `AWS::S3::Bucket` named `ServerlessDeploymentBucket` | Deployment bucket | Use `sls.deploymentBucket` |
-| `AWS::S3::BucketPolicy` on that bucket | Deployment bucket | Included in `sls.deploymentBucket` |
-| `AWS::IAM::Role` with `AssumeRolePolicyDocument` allowing `lambda.amazonaws.com` | Lambda execution role | Use `sls.iamRole()` |
+| `AWS::S3::Bucket` named `ServerlessDeploymentBucket` | Deployment bucket | Use `sls.deploymentBucketG` |
+| `AWS::S3::BucketPolicy` on that bucket | Deployment bucket | Included in `sls.deploymentBucketG` |
+| `AWS::IAM::Role` with `AssumeRolePolicyDocument` allowing `lambda.amazonaws.com` | Lambda execution role | Use `sls.iamRoleG()` |
 | `AWS::Logs::LogGroup` with name `/aws/lambda/...` | Lambda triplet (1/3) | Part of `sls.lambdaFnG()` |
 | `AWS::Lambda::Function` | Lambda triplet (2/3) | Part of `sls.lambdaFnG()` |
 | `AWS::Lambda::Version` referencing a function | Lambda triplet (3/3) | Part of `sls.lambdaFnG()` |
@@ -39,7 +39,7 @@ Read the template and classify every resource by pattern. Use this table:
 | `AWS::SQS::Queue` | SQS queue | Use `sls.sqsQueue()` |
 | `AWS::Lambda::EventSourceMapping` with SQS source | SQS event | Use `sls.sqsEventSource()` |
 | `AWS::Lambda::EventSourceMapping` with DynamoDB source | DynamoDB stream | Not yet in library — use raw Jsonnet object |
-| `AWS::ApiGateway::RestApi` | REST API (v1) | Use `sls.restApi()` |
+| `AWS::ApiGateway::RestApi` | REST API (v1) | Use `sls.restApiG()` |
 | `AWS::ApiGateway::Resource` | REST API path segment | Use `sls.apiResource()` |
 | `AWS::ApiGateway::Method` with `Type: AWS_PROXY` | REST API route | Use `sls.apiMethod()` |
 | `AWS::ApiGateway::Method` with `Type: MOCK` and `HttpMethod: OPTIONS` | CORS mock | Use `sls.corsOptions()` |
@@ -48,8 +48,8 @@ Read the template and classify every resource by pattern. Use this table:
 | `AWS::ApiGateway::ApiKey` | API key | Part of API key bundle (manual block or `sam.Api` with UsagePlan) |
 | `AWS::ApiGateway::UsagePlan` | Usage plan | Part of API key bundle |
 | `AWS::ApiGateway::UsagePlanKey` | Usage plan key | Part of API key bundle |
-| `AWS::ApiGatewayV2::Api` | HTTP API (v2) | Use `sls.httpApi()` |
-| `AWS::ApiGatewayV2::Stage` | HTTP API stage | Included in `sls.httpApi()` |
+| `AWS::ApiGatewayV2::Api` | HTTP API (v2) | Use `sls.httpApiG()` |
+| `AWS::ApiGatewayV2::Stage` | HTTP API stage | Included in `sls.httpApiG()` |
 | `AWS::ApiGatewayV2::Authorizer` | JWT authorizer | Use `sls.httpApiJwtAuthorizer()` |
 | `AWS::ApiGatewayV2::Integration` | HTTP API integration | Part of `sls.httpApiFnG()` |
 | `AWS::ApiGatewayV2::Route` | HTTP API route | Part of `sls.httpApiFnG()` |
@@ -108,8 +108,8 @@ local extraStatements = [ ... ];
 {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
-    sls.deploymentBucket
-    + sls.iamRole(service + '-' + stage, extraStatements)
+    sls.deploymentBucketG
+    + sls.iamRoleG(service + '-' + stage, extraStatements)
     + sls.lambdaFnG(...)
     + ...remaining resources...,
   Outputs: { ... },
@@ -209,7 +209,7 @@ ApiGatewayRestApi
 
 Path parameters become `{name}` → `Var` suffix: `{id}` → `IdVar`, `{proxy+}` → `ProxyVar`.
 
-**Replace with:** `sls.restApi()` + `sls.apiResource()` per segment, or `sam.Api()` which auto-generates the tree.
+**Replace with:** `sls.restApiG()` + `sls.apiResource()` per segment, or `sam.Api()` which auto-generates the tree.
 
 ### The API method + CORS pair
 
@@ -249,7 +249,7 @@ HttpApiRoute{Method}{Path}           → AWS::ApiGatewayV2::Route (one per event
 {Function}LambdaPermissionHttpApi    → AWS::Lambda::Permission
 ```
 
-**Replace with:** `sls.httpApi()` + `sls.httpApiJwtAuthorizer()` + `sls.httpApiFnG()`, or `sam.HttpApi()`.
+**Replace with:** `sls.httpApiG()` + `sls.httpApiJwtAuthorizer()` + `sls.httpApiFnG()`, or `sam.HttpApi()`.
 
 ### The deployment bucket
 
@@ -260,7 +260,7 @@ ServerlessDeploymentBucket        → AWS::S3::Bucket (AES256 encryption)
 ServerlessDeploymentBucketPolicy  → AWS::S3::BucketPolicy (deny insecure transport)
 ```
 
-**Replace with:** `sls.deploymentBucket` (a constant, not a function call).
+**Replace with:** `sls.deploymentBucketG` (a constant, not a function call).
 
 ### The IAM execution role
 
@@ -285,6 +285,6 @@ IamRoleLambdaExecution → AWS::IAM::Role
   ManagedPolicyArns: [...optional, e.g. VPC access policy...]
 ```
 
-**Replace with:** `sls.iamRole(namePrefix, extraStatements, managedPolicies)`
+**Replace with:** `sls.iamRoleG(namePrefix, extraStatements, managedPolicies)`
 
 The base log permissions are generated automatically. Only pass the extra statements.

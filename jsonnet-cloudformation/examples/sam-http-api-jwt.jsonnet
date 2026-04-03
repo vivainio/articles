@@ -65,8 +65,8 @@ local httpApi = sam.HttpApi('UserHttpApi', {
 {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
-    sls.deploymentBucket
-    + sls.iamRole(service + '-' + stage, apiHandler.extraStatements)
+    sls.deploymentBucketG
+    + sls.iamRoleG(service + '-' + stage, apiHandler.extraStatements)
     + apiHandler.resources
     + httpApi.resources,
   Outputs: {

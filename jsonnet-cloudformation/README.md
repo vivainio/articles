@@ -230,8 +230,8 @@ local sls = import 'lib/sls.libsonnet';
 {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
-    sls.deploymentBucket
-    + sls.iamRole('my-service-dev', [...])
+    sls.deploymentBucketG
+    + sls.iamRoleG('my-service-dev', [...])
     + sls.lambdaFnG(logicalName='Worker', functionName='my-service-dev-worker', ...)
     + sls.scheduleEventG('Worker', 'cron(0 3 * * ? *)'),
 }
@@ -251,9 +251,9 @@ Each helper maps to what SLS/SAM auto-generated from a high-level declaration:
 | `events: - sqs:` | `sls.sqsEventSource(...)` | Lambda::EventSourceMapping |
 | `events: - http:` | `sls.apiMethod(...)` + `sls.corsOptions(...)` | Method + CORS OPTIONS mock |
 | `events: - httpApi:` | `sls.httpApiFnG(...)` | Integration + Routes + Permission |
-| `provider.iamRoleStatements` | `sls.iamRole(...)` | IAM::Role with scoped log perms |
+| `provider.iamRoleStatements` | `sls.iamRoleG(...)` | IAM::Role with scoped log perms |
 | `provider.apiKeys` | (manual) | ApiKey + UsagePlan + UsagePlanKey |
-| implicit | `sls.deploymentBucket` | S3::Bucket + BucketPolicy |
+| implicit | `sls.deploymentBucketG` | S3::Bucket + BucketPolicy |
 | SLS log-subscription plugin | `sls.lambdaFnG(..., logDestination=...)` | Logs::SubscriptionFilter |
 
 ## Examples
@@ -372,8 +372,8 @@ functions return a single resource value, used as `{ LogicalId: sls.helper(...) 
 
 ```jsonnet
 Resources:
-  sls.deploymentBucket              // S3 bucket + policy (fixed keys)
-  + sls.iamRole(...)                // IAM role (fixed key)
+  sls.deploymentBucketG              // S3 bucket + policy (fixed keys)
+  + sls.iamRoleG(...)                // IAM role (fixed key)
   + sls.lambdaFnG(...)             // LogGroup + Function + Version
   + sls.scheduleEventG(...)        // Events::Rule + Permission
   + {
@@ -560,7 +560,7 @@ local api = sam.Api('MyApi', {
 {
   AWSTemplateFormatVersion: '2010-09-09',
   Resources:
-    sls.iamRole('my-service-dev', fn.extraStatements)
+    sls.iamRoleG('my-service-dev', fn.extraStatements)
     + fn.resources     // LogGroup + Function + Version
     + api.resources,   // RestApi + Resources + Methods + CORS + Deployment
 }
@@ -568,7 +568,7 @@ local api = sam.Api('MyApi', {
 
 The `sam.Function()` call returns:
 - `.resources` — the Lambda triplet (and any non-API event resources)
-- `.extraStatements` — IAM statements extracted from `Policies:` (pass to `sls.iamRole`)
+- `.extraStatements` — IAM statements extracted from `Policies:` (pass to `sls.iamRoleG`)
 - `.apiEvents` / `.httpApiEvents` — collected for the API expander
 
 The `sam.Api()` call consumes those collected events and generates the full API

@@ -41,8 +41,8 @@ local authRef = cfn.ref(authorizerLogical);
   AWSTemplateFormatVersion: '2010-09-09',
 
   Resources:
-    sls.deploymentBucket
-    + sls.iamRole(service + '-' + stage, [
+    sls.deploymentBucketG
+    + sls.iamRoleG(service + '-' + stage, [
       cfn.allow(actions.ddbAll, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
     ])
 
@@ -57,7 +57,7 @@ local authRef = cfn.ref(authorizerLogical);
     )
 
     // HTTP API + auto-deploy stage
-    + sls.httpApi(stage + '-' + service)
+    + sls.httpApiG(stage + '-' + service)
 
     // JWT authorizer
     + { [authorizerLogical]: sls.httpApiJwtAuthorizer(
