@@ -63,9 +63,15 @@ Reviewing a `cdk diff` in a pull request means staring at hundreds of lines of
 machine-generated JSON that no human authored — you're trusting the abstraction
 rather than reviewing the infrastructure.
 
-CDK shines when you have large, complex infrastructure with dozens of
-interdependent resources — but for typical serverless stacks (a few Lambdas, an
-API Gateway, some queues), it's overkill.
+There's also the migration problem: CDK creates its own stacks with its own
+logical IDs. You can't deploy CDK to your existing Serverless/SAM stacks —
+you'd be creating entirely new stacks alongside the old ones, then migrating
+stateful resources (DynamoDB tables, SQS queues, S3 buckets) from the old
+stacks to the new ones. That means `DeletionPolicy: Retain`, manual imports,
+and careful ordering — one mistake and you lose data.
+
+CDK shines when you're building from scratch with large, complex infrastructure
+— but for migrating existing serverless stacks, it's the wrong tool.
 
 ### Why not Terraform?
 
