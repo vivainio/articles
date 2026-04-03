@@ -12,12 +12,14 @@ local stage = std.extVar('stage');
 local table = service + '-' + stage;
 local bucket = service + '-' + stage + '-data';
 local partner = cfn.ref('PartnerAccountId');
+local logDest = cfn.ref('LogDestinationArn');
 
 {
   AWSTemplateFormatVersion: '2010-09-09',
 
   Parameters: {
     PartnerAccountId: cfn.param(description='AWS account ID allowed to invoke the function'),
+    LogDestinationArn: cfn.param(description='Kinesis/Firehose destination ARN for log forwarding'),
   },
 
   Resources:
@@ -38,6 +40,9 @@ local partner = cfn.ref('PartnerAccountId');
       DataBucket: aws.bucket(bucket),
       TableNameParam: cfn.ssmOutput('/' + service + '/' + stage + '/table-name', cfn.ref('DataTable')),
       BucketNameParam: cfn.ssmOutput('/' + service + '/' + stage + '/bucket-name', cfn.ref('DataBucket')),
+
+      // Forward Lambda logs to central logging
+      AppLogForward: aws.logSubscription('/aws/lambda/' + service + '-' + stage + '-app', logDest),
 
       // Cross-account role: partner can invoke our Lambda
       PartnerInvokerRole: aws.assumableRole([partner], [
