@@ -127,14 +127,18 @@ local extraStatements = [ ... ];
 Instruct the user to run:
 
 ```sh
-jsonnet --ext-str stage=dev my-service.jsonnet > generated.json
+jsonnet --preserve-field-order --ext-str stage=dev my-service.jsonnet > generated.json
 diff <(python3 -m json.tool original.json) <(python3 -m json.tool generated.json)
 ```
 
 Expected differences:
-- JSON key ordering (Jsonnet sorts alphabetically, SLS does not)
 - Lambda::Version logical IDs (SLS embeds a hash, Jsonnet uses a stable name)
 - Minor formatting
+
+Note: Use `--preserve-field-order` (available in
+[go-jsonnet-fork](https://github.com/vivainio/go-jsonnet-fork)) to keep keys
+in source order. Without it, Jsonnet sorts keys alphabetically, producing noisy
+diffs against the original template.
 
 Unexpected differences to investigate:
 - Missing resources (forgot to include a pattern)
