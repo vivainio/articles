@@ -40,11 +40,7 @@ local authRef = cfn.ref(authorizerLogical);
   Resources:
     cfn.deploymentBucket
     + cfn.iamRole(service, stage, [
-      {
-        Effect: 'Allow',
-        Action: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan'],
-        Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage),
-      },
+      cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
     ])
 
     // Lambda function

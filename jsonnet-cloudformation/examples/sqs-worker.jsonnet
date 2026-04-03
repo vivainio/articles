@@ -46,16 +46,8 @@ local tags = cfn.tags({
   Resources:
     cfn.deploymentBucket
     + cfn.iamRole(service, stage, [
-      {
-        Effect: 'Allow',
-        Action: ['sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:GetQueueAttributes'],
-        Resource: [cfn.getAtt('OrderQueue', 'Arn')],
-      },
-      {
-        Effect: 'Allow',
-        Action: ['dynamodb:PutItem'],
-        Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage),
-      },
+      cfn.allow(['sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:GetQueueAttributes'], [cfn.getAtt('OrderQueue', 'Arn')]),
+      cfn.allow(['dynamodb:PutItem'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage)),
     ])
 
     // Lambda consumer — limited to 5 concurrent executions

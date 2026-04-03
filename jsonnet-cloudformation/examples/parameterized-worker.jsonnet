@@ -44,11 +44,7 @@ local service = 'data-processor';
   Resources:
     cfn.deploymentBucket
     + cfn.iamRole(service, cfn.ref('Stage'), [
-      {
-        Effect: 'Allow',
-        Action: ['s3:GetObject', 's3:PutObject'],
-        Resource: cfn.sub('arn:aws:s3:::${Stage}-data-bucket/*'),
-      },
+      cfn.allow(['s3:GetObject', 's3:PutObject'], cfn.sub('arn:aws:s3:::${Stage}-data-bucket/*')),
     ], managedPolicies=[
       'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',
     ])

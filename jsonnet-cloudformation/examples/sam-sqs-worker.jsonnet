@@ -37,16 +37,8 @@ local processor = sam.Function('Processor', {
   Policies: [{
     Version: '2012-10-17',
     Statement: [
-      {
-        Effect: 'Allow',
-        Action: ['sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:GetQueueAttributes'],
-        Resource: [cfn.getAtt('OrderQueue', 'Arn')],
-      },
-      {
-        Effect: 'Allow',
-        Action: ['dynamodb:PutItem'],
-        Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage),
-      },
+      cfn.allow(['sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:GetQueueAttributes'], [cfn.getAtt('OrderQueue', 'Arn')]),
+      cfn.allow(['dynamodb:PutItem'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage)),
     ],
   }],
   Events: {

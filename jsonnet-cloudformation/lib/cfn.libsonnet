@@ -20,6 +20,15 @@
   sub(str):: { 'Fn::Sub': str },
   ref(logical):: { Ref: logical },
 
+  // ── IAM policy shorthands ──────────────────────────────────────────────────
+  allow(actions, resource, condition=null)::
+    { Effect: 'Allow', Action: actions, Resource: resource }
+    + (if condition != null then { Condition: condition } else {}),
+
+  deny(actions, resource, condition=null)::
+    { Effect: 'Deny', Action: actions, Resource: resource }
+    + (if condition != null then { Condition: condition } else {}),
+
   // ── Parameter shorthands ───────────────────────────────────────────────────
   param(type='String', default=null, description=null, allowed=null)::
     { Type: type }

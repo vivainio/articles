@@ -60,11 +60,9 @@ local apiHandler = sam.Function('Api', {
   CodeUri: 's3://my-deploy-bucket/' + service + '/' + stage + '/package.zip',
   Policies: [{
     Version: '2012-10-17',
-    Statement: [{
-      Effect: 'Allow',
-      Action: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query'],
-      Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-' + stage),
-    }],
+    Statement: [
+      cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-' + stage)),
+    ],
   }],
   Events: {
     GetTodos:    { Type: 'Api', Properties: { Path: '/todos',      Method: 'get',    Auth: { ApiKeyRequired: true } } },

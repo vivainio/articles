@@ -57,11 +57,7 @@ local methods = [
   Resources:
     cfn.deploymentBucket
     + cfn.iamRole(service, stage, [
-      {
-        Effect: 'Allow',
-        Action: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query'],
-        Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-*'),
-      },
+      cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-*')),
     ])
 
     // Single Lambda function serving all routes

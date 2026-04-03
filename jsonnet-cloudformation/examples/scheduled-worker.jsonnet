@@ -35,7 +35,7 @@ local stage   = std.extVar('stage');
   Resources:
     cfn.deploymentBucket
     + cfn.iamRole(service, stage, [
-      { Effect: 'Allow', Action: ['ec2:DescribeSnapshots', 'ec2:DeleteSnapshot'], Resource: '*' },
+      cfn.allow(['ec2:DescribeSnapshots', 'ec2:DeleteSnapshot'], '*'),
     ])
     + cfn.lambdaFn(
       logicalName='Worker',

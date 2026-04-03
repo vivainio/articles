@@ -36,11 +36,9 @@ local apiHandler = sam.Function('Api', {
   Environment: { Variables: { STAGE: stage, TABLE_NAME: 'users-' + stage } },
   Policies: [{
     Version: '2012-10-17',
-    Statement: [{
-      Effect: 'Allow',
-      Action: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan'],
-      Resource: cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage),
-    }],
+    Statement: [
+      cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
+    ],
   }],
   Events: {
     GetUser:    { Type: 'HttpApi', Properties: { Path: '/users/{id}', Method: 'GET',    Auth: { Authorizer: 'auth0' } } },
