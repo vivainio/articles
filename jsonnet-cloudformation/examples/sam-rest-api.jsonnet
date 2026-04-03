@@ -58,12 +58,9 @@ local globals = {
 local apiHandler = sam.Function('Api', {
   Handler: 'wsgi_handler.handler',
   CodeUri: 's3://my-deploy-bucket/' + service + '/' + stage + '/package.zip',
-  Policies: [{
-    Version: '2012-10-17',
-    Statement: [
-      cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-' + stage)),
-    ],
-  }],
+  Policies: cfn.policies([
+    cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-' + stage)),
+  ]),
   Events: {
     GetTodos:    { Type: 'Api', Properties: { Path: '/todos',      Method: 'get',    Auth: { ApiKeyRequired: true } } },
     PostTodos:   { Type: 'Api', Properties: { Path: '/todos',      Method: 'post',   Auth: { ApiKeyRequired: true } } },

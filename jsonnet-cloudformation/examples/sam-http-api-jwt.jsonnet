@@ -34,12 +34,9 @@ local apiHandler = sam.Function('Api', {
   Handler: 'app.handler',
   CodeUri: 's3://my-deploy-bucket/' + service + '/' + stage + '/package.zip',
   Environment: { Variables: { STAGE: stage, TABLE_NAME: 'users-' + stage } },
-  Policies: [{
-    Version: '2012-10-17',
-    Statement: [
-      cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
-    ],
-  }],
+  Policies: cfn.policies([
+    cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
+  ]),
   Events: {
     GetUser:    { Type: 'HttpApi', Properties: { Path: '/users/{id}', Method: 'GET',    Auth: { Authorizer: 'auth0' } } },
     PutUser:    { Type: 'HttpApi', Properties: { Path: '/users/{id}', Method: 'PUT',    Auth: { Authorizer: 'auth0' } } },

@@ -34,13 +34,10 @@ local processor = sam.Function('Processor', {
   ReservedConcurrentExecutions: 5,
   Environment: { Variables: { STAGE: stage, TABLE_NAME: 'orders-' + stage } },
   Tags: { Service: service, Stage: stage },
-  Policies: [{
-    Version: '2012-10-17',
-    Statement: [
-      cfn.allow(['sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:GetQueueAttributes'], [cfn.getAtt('OrderQueue', 'Arn')]),
-      cfn.allow(['dynamodb:PutItem'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage)),
-    ],
-  }],
+  Policies: cfn.policies([
+    cfn.allow(['sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:GetQueueAttributes'], [cfn.getAtt('OrderQueue', 'Arn')]),
+    cfn.allow(['dynamodb:PutItem'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage)),
+  ]),
   Events: {
     OrderEvent: {
       Type: 'SQS',

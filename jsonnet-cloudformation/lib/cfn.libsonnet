@@ -29,6 +29,8 @@
     { Effect: 'Deny', Action: actions, Resource: resource }
     + (if condition != null then { Condition: condition } else {}),
 
+  policies(statements):: [{ Version: '2012-10-17', Statement: statements }],
+
   // ── Parameter shorthands ───────────────────────────────────────────────────
   param(type='String', default=null, description=null, allowed=null)::
     { Type: type }
