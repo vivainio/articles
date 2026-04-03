@@ -114,6 +114,17 @@ not the deployed infrastructure. The stack, the Lambda functions, the API
 Gateway — everything stays in place. CloudFormation only acts on differences,
 and if there are none, nothing changes.
 
+This matters because moving resources between CloudFormation stacks is painful.
+If a stack owns a DynamoDB table or an SQS queue, you can't just declare it in
+a new stack — CloudFormation will try to create a new one, and the old stack
+still holds the original. Migrating stateful resources across stacks requires
+`DeletionPolicy: Retain`, manual imports, and careful ordering to avoid data
+loss. CDK makes this worse: because it generates logical IDs from hashes of the
+construct path, even renaming a construct or moving it in the tree changes the
+logical ID, which CloudFormation interprets as "delete the old resource and
+create a new one." The safest path is to keep your existing stacks and change
+only how the template is generated — which is exactly what this approach does.
+
 The same approach works for SAM templates: run `sam build` to get the expanded
 CloudFormation, then factor it into `sam.libsonnet` calls that produce the
 same output.
@@ -273,6 +284,34 @@ Resources:
 This is the key design: each helper is independent, there's no hidden state,
 and the output is a flat resource map that CloudFormation consumes directly.
 
+### Custom abstractions
+
+Because Jsonnet has functions, imports, and object merging, you can build the
+same kind of project-level abstractions that CDK users create with custom
+constructs. A common example is enforcing a standard set of tags on every
+resource:
+
+```jsonnet
+local standardTags(service, stage) = {
+  Tags: [
+    { Key: 'Service', Value: service },
+    { Key: 'Stage', Value: stage },
+    { Key: 'Team', Value: 'platform' },
+    { Key: 'ManagedBy', Value: 'cloudformation' },
+  ],
+};
+
+// Apply to every resource that supports tags:
+lambdaFn(logicalName, functionName, handler, ..., tags=standardTags(service, stage))
+```
+
+You can also write functions that compose multiple helpers into a
+higher-level unit — a "microservice" function that bundles a Lambda, its
+log group, an alarm, and a dashboard widget into a single call. The difference
+from CDK is that these abstractions are pure data transformations, not classes
+with side effects. You can print the output, diff it, and reason about it
+without running anything.
+
 ## Replacing SAM with sam.libsonnet
 
 If you're already using SAM templates (or thinking in SAM terms), there's a
@@ -419,3 +458,26 @@ automation you want vs. how much control you need.
 4. Render: `jsonnet --ext-str stage=dev my-service.jsonnet > template.json`
 5. Validate: `aws cloudformation validate-template --template-body file://template.json`
 6. Deploy: `aws cloudformation deploy --template-file template.json --stack-name my-service-dev --capabilities CAPABILITY_NAMED_IAM`
+
+## Caveats
+
+**Key ordering.** The Go implementation of Jsonnet (`jsonnet-go`, which is what
+`brew install go-jsonnet` and most package managers ship) sorts object keys
+alphabetically by default. This means your output JSON will have `Resources`
+before `AWSTemplateFormatVersion`, and properties within each resource will be
+reordered. CloudFormation doesn't care about key order, but it makes the output
+harder to diff against hand-written templates or the original Serverless/SAM
+output, and reduces the readability of the generated JSON.
+
+I maintain a fork of jsonnet-go that adds a `--preserve-field-order` flag:
+[github.com/vivainio/go-jsonnet-fork](https://github.com/vivainio/go-jsonnet-fork).
+With this flag, keys appear in the order you wrote them in the `.jsonnet` file,
+which makes diffs cleaner and the output easier to read. I plan to propose this
+for upstream after more usage.
+
+**Not yet battle-tested.** This approach has not been used for any production
+serverless stack yet. The library and examples are functional but unproven at
+scale. Any loss of resources or data resulting from deploying these templates is
+your responsibility. Always review the CloudFormation changeset before deploying
+— `aws cloudformation deploy` shows the diff, and you should read every line of
+it before confirming.
