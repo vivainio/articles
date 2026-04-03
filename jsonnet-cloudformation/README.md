@@ -14,6 +14,7 @@
 - [How it works](#how-it-works) — object merging and custom abstractions
 - [Replacing SAM with sam.libsonnet](#replacing-sam-with-samlibsonnet) — SAM-shaped input, plain CFN output
 - [Beyond serverless](#beyond-serverless--greenfield-cloudformation) — resource factories, policy libraries, config-driven stacks
+- [Targeting SAM output](#targeting-sam-output) — when to let SAM do the expansion
 - [Trade-offs](#trade-offs) — what you gain and lose
 - [Getting started](#getting-started)
 - [Caveats](#caveats) — key ordering, maturity, AI authorship
@@ -248,6 +249,10 @@ Each helper maps to what SLS/SAM auto-generated from a high-level declaration:
 | SLS log-subscription plugin | `sls.lambdaFnG(..., logDestination=...)` | Logs::SubscriptionFilter |
 
 ## Examples
+
+Each `.jsonnet` file has a matching `.yaml` file next to it containing the
+expanded CloudFormation output, so you can see what the template generates
+without installing Jsonnet.
 
 ### 1. Scheduled worker (54 lines → 8 resources)
 
@@ -739,6 +744,23 @@ There's no framework to initialize, no bootstrap step, and no convention to
 follow beyond "functions return objects, merge with `+`." Start with inline
 local functions. Extract to a shared `.libsonnet` file when the same pattern
 appears in a second stack.
+
+## Targeting SAM output
+
+Everything above assumes Jsonnet replaces SAM by expanding to raw
+CloudFormation. But Jsonnet can also produce SAM templates — just emit
+`Transform: 'AWS::Serverless-2016-10-31'` and use `AWS::Serverless::Function`
+directly. This makes sense when your existing SAM template already works and
+the complexity is elsewhere: duplicated IAM policies across multiple roles,
+repeated VPC/tag/environment blocks across functions, or derived values that
+are awkward to thread through CloudFormation `!Sub` and `!Ref`. Jsonnet handles
+composition and deduplication; SAM handles Lambda packaging and the
+`sam deploy` workflow. The output is JSON, and `sam deploy --template-file`
+accepts JSON the same as YAML. If you prefer YAML for readability or
+diff-friendliness, a one-liner in your build script converts the output:
+`jsonnet template.jsonnet | python3 -c 'import sys,json,yaml; yaml.dump(json.load(sys.stdin),sys.stdout,default_flow_style=False)'`.
+This is the pragmatic choice when the SAM transform is earning its keep and you don't want
+to rewrite working infrastructure just to avoid it.
 
 ## Trade-offs
 
