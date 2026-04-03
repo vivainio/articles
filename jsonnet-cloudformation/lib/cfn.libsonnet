@@ -45,6 +45,17 @@
   output(value):: { Value: value },
   exportOutput(value, name):: { Value: value, Export: { Name: name } },
 
+  // ── SSM Parameter output ────────────────────────────────────────────────
+  // Creates an SSM Parameter resource to export a value for other stacks.
+  ssmOutput(name, value, description=null):: {
+    Type: 'AWS::SSM::Parameter',
+    Properties: {
+      Name: name,
+      Type: 'String',
+      Value: value,
+    } + (if description != null then { Description: description } else {}),
+  },
+
   // ── Tags ───────────────────────────────────────────────────────────────────
   // Convert { Key: Value } object to CFN Tags array format.
   tags(obj):: [{ Key: k, Value: obj[k] } for k in std.objectFields(obj)],

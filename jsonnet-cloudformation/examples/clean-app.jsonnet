@@ -31,6 +31,8 @@ local bucket = service + '-' + stage + '-data';
       ]),
       DataTable: aws.table(table, 'id'),
       DataBucket: aws.bucket(bucket),
+      TableNameParam: cfn.ssmOutput('/' + service + '/' + stage + '/table-name', cfn.ref('DataTable')),
+      BucketNameParam: cfn.ssmOutput('/' + service + '/' + stage + '/bucket-name', cfn.ref('DataBucket')),
     },
 
   Outputs: {
