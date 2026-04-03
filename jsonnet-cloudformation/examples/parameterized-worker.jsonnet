@@ -12,6 +12,7 @@
 //     --capabilities CAPABILITY_NAMED_IAM
 
 local cfn = import '../lib/cfn.libsonnet';
+local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'data-processor';
 
@@ -44,7 +45,7 @@ local service = 'data-processor';
   Resources:
     cfn.deploymentBucket
     + cfn.iamRole(service, cfn.ref('Stage'), [
-      cfn.allow(['s3:GetObject', 's3:PutObject'], cfn.sub('arn:aws:s3:::${Stage}-data-bucket/*')),
+      cfn.allow(actions.s3Read + actions.s3Write, cfn.sub('arn:aws:s3:::${Stage}-data-bucket/*')),
     ], managedPolicies=[
       'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',
     ])

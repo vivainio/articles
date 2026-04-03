@@ -25,6 +25,7 @@
 
 local sam = import '../lib/sam.libsonnet';
 local cfn = import '../lib/cfn.libsonnet';
+local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'user-api';
 local stage   = std.extVar('stage');
@@ -35,7 +36,7 @@ local apiHandler = sam.Function('Api', {
   CodeUri: 's3://my-deploy-bucket/' + service + '/' + stage + '/package.zip',
   Environment: { Variables: { STAGE: stage, TABLE_NAME: 'users-' + stage } },
   Policies: cfn.policies([
-    cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
+    cfn.allow(actions.ddbAll, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
   ]),
   Events: {
     GetUser:    { Type: 'HttpApi', Properties: { Path: '/users/{id}', Method: 'GET',    Auth: { Authorizer: 'auth0' } } },

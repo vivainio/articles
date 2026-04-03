@@ -27,6 +27,7 @@
 //         - httpApi: { method: POST,   path: /users,       authorizer: auth0 }
 
 local cfn = import '../lib/cfn.libsonnet';
+local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'user-api';
 local stage   = std.extVar('stage');
@@ -41,7 +42,7 @@ local authRef = cfn.ref(authorizerLogical);
   Resources:
     cfn.deploymentBucket
     + cfn.iamRole(service, stage, [
-      cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
+      cfn.allow(actions.ddbAll, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users-' + stage)),
     ])
 
     // Lambda function

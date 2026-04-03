@@ -19,6 +19,7 @@
 
 local sam = import '../lib/sam.libsonnet';
 local cfn = import '../lib/cfn.libsonnet';
+local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'order-processor';
 local stage   = std.extVar('stage');
@@ -35,8 +36,8 @@ local processor = sam.Function('Processor', {
   Environment: { Variables: { STAGE: stage, TABLE_NAME: 'orders-' + stage } },
   Tags: { Service: service, Stage: stage },
   Policies: cfn.policies([
-    cfn.allow(['sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:GetQueueAttributes'], [cfn.getAtt('OrderQueue', 'Arn')]),
-    cfn.allow(['dynamodb:PutItem'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage)),
+    cfn.allow(actions.sqsConsume, [cfn.getAtt('OrderQueue', 'Arn')]),
+    cfn.allow(actions.ddbWrite, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/orders-' + stage)),
   ]),
   Events: {
     OrderEvent: {

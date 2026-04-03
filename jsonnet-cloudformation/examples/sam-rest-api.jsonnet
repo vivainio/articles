@@ -40,6 +40,7 @@
 
 local sam = import '../lib/sam.libsonnet';
 local cfn = import '../lib/cfn.libsonnet';
+local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'todo-api';
 local stage   = std.extVar('stage');
@@ -59,7 +60,7 @@ local apiHandler = sam.Function('Api', {
   Handler: 'wsgi_handler.handler',
   CodeUri: 's3://my-deploy-bucket/' + service + '/' + stage + '/package.zip',
   Policies: cfn.policies([
-    cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-' + stage)),
+    cfn.allow(actions.ddbRead + actions.ddbWrite, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-' + stage)),
   ]),
   Events: {
     GetTodos:    { Type: 'Api', Properties: { Path: '/todos',      Method: 'get',    Auth: { ApiKeyRequired: true } } },

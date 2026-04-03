@@ -29,6 +29,7 @@
 //         - http: { method: delete, path: /todos/{id}, cors: true, private: true }
 
 local cfn = import '../lib/cfn.libsonnet';
+local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'todo-api';
 local stage   = std.extVar('stage');
@@ -58,7 +59,7 @@ local methods = [
   Resources:
     cfn.deploymentBucket
     + cfn.iamRole(service, stage, [
-      cfn.allow(['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:Query'], cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-*')),
+      cfn.allow(actions.ddbRead + actions.ddbWrite, cfn.sub('arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/todos-*')),
     ])
 
     // Single Lambda function serving all routes
