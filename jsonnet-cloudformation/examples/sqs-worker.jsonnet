@@ -53,7 +53,7 @@ local tags = cfn.tags({
     ])
 
     // Lambda consumer — limited to 5 concurrent executions
-    + sls.lambdaFn(
+    + sls.lambdaFnG(
       logicalName='Processor',
       functionName=service + '-' + stage + '-processor',
       handler='src/processor.handler',
@@ -66,25 +66,21 @@ local tags = cfn.tags({
       reservedConcurrency=5,
     )
 
-    // SQS event source mapping (from `events: - sqs:`)
-    + sls.sqsEventSource(
-      'ProcessorEventSourceMapping',
-      'ProcessorLambdaFunction',
-      'OrderQueue',
-      batchSize=10,
-    )
+    + {
+      // SQS event source mapping (from `events: - sqs:`)
+      ProcessorEventSourceMapping: sls.sqsEventSource('ProcessorLambdaFunction', 'OrderQueue', batchSize=10),
 
-    // Dead-letter queue
-    + sls.sqsQueue('OrderDLQ', tags=tags)
+      // Dead-letter queue
+      OrderDLQ: sls.sqsQueue(tags=tags),
 
-    // Main queue with redrive policy
-    + sls.sqsQueue(
-      'OrderQueue',
-      visibilityTimeout=180,
-      dlqArn=cfn.getAtt('OrderDLQ', 'Arn'),
-      maxReceiveCount=3,
-      tags=tags,
-    ),
+      // Main queue with redrive policy
+      OrderQueue: sls.sqsQueue(
+        visibilityTimeout=180,
+        dlqArn=cfn.getAtt('OrderDLQ', 'Arn'),
+        maxReceiveCount=3,
+        tags=tags,
+      ),
+    },
 
   Outputs: {
     QueueUrl: cfn.output(cfn.ref('OrderQueue')),

@@ -47,7 +47,7 @@ local authRef = cfn.ref(authorizerLogical);
     ])
 
     // Lambda function
-    + sls.lambdaFn(
+    + sls.lambdaFnG(
       logicalName='Api',
       functionName=service + '-' + stage + '-api',
       handler='app.handler',
@@ -60,15 +60,14 @@ local authRef = cfn.ref(authorizerLogical);
     + sls.httpApi(stage + '-' + service)
 
     // JWT authorizer
-    + sls.httpApiJwtAuthorizer(
-      authorizerLogical,
+    + { [authorizerLogical]: sls.httpApiJwtAuthorizer(
       'auth0',
       'https://example.auth0.com/',
       ['https://api.example.com'],
-    )
+    ) }
 
     // Integration + routes + permission (all in one call)
-    + sls.httpApiFn('Api', 'ApiLambdaFunction', [
+    + sls.httpApiFnG('Api', 'ApiLambdaFunction', [
       { logical: 'HttpApiRouteGetUsersIdVar',    routeKey: 'GET /users/{id}',    authorizerId: authRef },
       { logical: 'HttpApiRoutePutUsersIdVar',    routeKey: 'PUT /users/{id}',    authorizerId: authRef },
       { logical: 'HttpApiRouteDeleteUsersIdVar', routeKey: 'DELETE /users/{id}', authorizerId: authRef },

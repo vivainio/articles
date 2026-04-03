@@ -50,7 +50,7 @@ local service = 'data-processor';
     ], managedPolicies=[
       'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole',
     ])
-    + sls.lambdaFn(
+    + sls.lambdaFnG(
       logicalName='Processor',
       functionName=service + '-processor',
       handler='src/processor.handler',
@@ -68,7 +68,7 @@ local service = 'data-processor';
         SubnetIds: cfn.ref('SubnetIds'),
       },
     )
-    + sls.scheduleEvent('Processor', 'rate(1 hour)')
+    + sls.scheduleEventG('Processor', 'rate(1 hour)')
     + {
       // Security group — pass-through as raw Jsonnet
       LambdaSG: {

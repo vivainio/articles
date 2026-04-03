@@ -30,12 +30,12 @@ Read the template and classify every resource by pattern. Use this table:
 | `AWS::S3::Bucket` named `ServerlessDeploymentBucket` | Deployment bucket | Use `sls.deploymentBucket` |
 | `AWS::S3::BucketPolicy` on that bucket | Deployment bucket | Included in `sls.deploymentBucket` |
 | `AWS::IAM::Role` with `AssumeRolePolicyDocument` allowing `lambda.amazonaws.com` | Lambda execution role | Use `sls.iamRole()` |
-| `AWS::Logs::LogGroup` with name `/aws/lambda/...` | Lambda triplet (1/3) | Part of `sls.lambdaFn()` |
-| `AWS::Lambda::Function` | Lambda triplet (2/3) | Part of `sls.lambdaFn()` |
-| `AWS::Lambda::Version` referencing a function | Lambda triplet (3/3) | Part of `sls.lambdaFn()` |
-| `AWS::Logs::SubscriptionFilter` on a log group | Log forwarding | Use `logDestination` param on `sls.lambdaFn()` |
-| `AWS::Events::Rule` with `ScheduleExpression` | Schedule event | Use `sls.scheduleEvent()` |
-| `AWS::Lambda::Permission` for `events.amazonaws.com` | Schedule event (companion) | Included in `sls.scheduleEvent()` |
+| `AWS::Logs::LogGroup` with name `/aws/lambda/...` | Lambda triplet (1/3) | Part of `sls.lambdaFnG()` |
+| `AWS::Lambda::Function` | Lambda triplet (2/3) | Part of `sls.lambdaFnG()` |
+| `AWS::Lambda::Version` referencing a function | Lambda triplet (3/3) | Part of `sls.lambdaFnG()` |
+| `AWS::Logs::SubscriptionFilter` on a log group | Log forwarding | Use `logDestination` param on `sls.lambdaFnG()` |
+| `AWS::Events::Rule` with `ScheduleExpression` | Schedule event | Use `sls.scheduleEventG()` |
+| `AWS::Lambda::Permission` for `events.amazonaws.com` | Schedule event (companion) | Included in `sls.scheduleEventG()` |
 | `AWS::SQS::Queue` | SQS queue | Use `sls.sqsQueue()` |
 | `AWS::Lambda::EventSourceMapping` with SQS source | SQS event | Use `sls.sqsEventSource()` |
 | `AWS::Lambda::EventSourceMapping` with DynamoDB source | DynamoDB stream | Not yet in library — use raw Jsonnet object |
@@ -51,9 +51,9 @@ Read the template and classify every resource by pattern. Use this table:
 | `AWS::ApiGatewayV2::Api` | HTTP API (v2) | Use `sls.httpApi()` |
 | `AWS::ApiGatewayV2::Stage` | HTTP API stage | Included in `sls.httpApi()` |
 | `AWS::ApiGatewayV2::Authorizer` | JWT authorizer | Use `sls.httpApiJwtAuthorizer()` |
-| `AWS::ApiGatewayV2::Integration` | HTTP API integration | Part of `sls.httpApiFn()` |
-| `AWS::ApiGatewayV2::Route` | HTTP API route | Part of `sls.httpApiFn()` |
-| `AWS::Lambda::Permission` for `apigateway.amazonaws.com` (v2) | HTTP API permission | Included in `sls.httpApiFn()` |
+| `AWS::ApiGatewayV2::Integration` | HTTP API integration | Part of `sls.httpApiFnG()` |
+| `AWS::ApiGatewayV2::Route` | HTTP API route | Part of `sls.httpApiFnG()` |
+| `AWS::Lambda::Permission` for `apigateway.amazonaws.com` (v2) | HTTP API permission | Included in `sls.httpApiFnG()` |
 | `AWS::EC2::SecurityGroup` | VPC security group | Pass-through as raw Jsonnet object |
 | `AWS::DynamoDB::Table` | DynamoDB table | Pass-through as raw Jsonnet object |
 | `AWS::SNS::Topic` | SNS topic | Pass-through as raw Jsonnet object |
@@ -110,7 +110,7 @@ local extraStatements = [ ... ];
   Resources:
     sls.deploymentBucket
     + sls.iamRole(service + '-' + stage, extraStatements)
-    + sls.lambdaFn(...)
+    + sls.lambdaFnG(...)
     + ...remaining resources...,
   Outputs: { ... },
 }
@@ -164,13 +164,13 @@ The prefix is the PascalCased function key from serverless.yml. SLS replaced
 - `api_handler` → `ApiUnderscorehandler`
 - `my-service` → `MyDashservice`
 
-**Replace with:** `sls.lambdaFn(logicalName='{Prefix}', ...)`
+**Replace with:** `sls.lambdaFnG(logicalName='{Prefix}', ...)`
 
 Optional fourth resource if log forwarding was configured:
 ```
 {Prefix}LogSubscriptionFilter → AWS::Logs::SubscriptionFilter
 ```
-**Replace with:** `logDestination` parameter on `sls.lambdaFn()`
+**Replace with:** `logDestination` parameter on `sls.lambdaFnG()`
 
 ### The schedule pair
 
@@ -181,7 +181,7 @@ Always two resources:
 {Prefix}LambdaPermissionEventsRuleSchedule1    → AWS::Lambda::Permission (events.amazonaws.com)
 ```
 
-**Replace with:** `sls.scheduleEvent('{Prefix}', schedule, enabled, ruleName)`
+**Replace with:** `sls.scheduleEventG('{Prefix}', schedule, enabled, ruleName)`
 
 ### The SQS event source
 
@@ -193,7 +193,7 @@ Single resource with a name like `{Prefix}EventSourceMappingSQS{QueueLogical}`:
   FunctionName: {Fn::GetAtt: [{Prefix}LambdaFunction, Arn]}
 ```
 
-**Replace with:** `sls.sqsEventSource(logicalName, functionLogical, queueLogical, batchSize)`
+**Replace with:** `{ logicalName: sls.sqsEventSource(functionLogical, queueLogical, batchSize) }`
 
 **Remember:** SLS auto-added `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:GetQueueAttributes` to the IAM role. These must be in `extraStatements`.
 
@@ -249,7 +249,7 @@ HttpApiRoute{Method}{Path}           → AWS::ApiGatewayV2::Route (one per event
 {Function}LambdaPermissionHttpApi    → AWS::Lambda::Permission
 ```
 
-**Replace with:** `sls.httpApi()` + `sls.httpApiJwtAuthorizer()` + `sls.httpApiFn()`, or `sam.HttpApi()`.
+**Replace with:** `sls.httpApi()` + `sls.httpApiJwtAuthorizer()` + `sls.httpApiFnG()`, or `sam.HttpApi()`.
 
 ### The deployment bucket
 

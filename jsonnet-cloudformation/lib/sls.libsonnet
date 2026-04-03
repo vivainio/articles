@@ -1,8 +1,17 @@
 // sls.libsonnet — Serverless resource builders that generate raw CloudFormation.
 //
 // These helpers recreate what the Serverless Framework (and SAM transform)
-// auto-generate from high-level declarations. Each function returns a flat
-// object of CFN resources that you merge with `+`.
+// auto-generate from high-level declarations.
+//
+// Naming convention:
+//   - Functions ending in G (lambdaFnG, scheduleEventG, httpApiFnG) return
+//     { LogicalId: Resource, ... } objects containing multiple resources.
+//     Merge them with `+`.
+//   - All other functions return a single resource value. Use as a value in
+//     a { LogicalId: sls.helper(...) } object — the logical ID is visible
+//     in your source, matching the CFN output.
+//   - deploymentBucket, iamRole, restApi, httpApi have fixed well-known keys
+//     and merge with `+`.
 //
 // Usage:
 //   local sls = import 'lib/sls.libsonnet';
@@ -11,7 +20,11 @@
 //     Resources:
 //       sls.deploymentBucket
 //       + sls.iamRole('my-service-dev', [...])
-//       + sls.lambdaFn(logicalName='Handler', ...)
+//       + sls.lambdaFnG(logicalName='Handler', ...)
+//       + sls.scheduleEventG('Handler', 'rate(1 hour)')
+//       + {
+//         MyQueue: sls.sqsQueue(tags=tags),
+//       },
 //   }
 
 {
@@ -89,14 +102,10 @@
   },
 
 
-  // ── Lambda Function ────────────────────────────────────────────────────────
+  // ── Lambda Function (G = group) ──────────────────────────────────────────
   // Expands to: LogGroup + Lambda::Function + Lambda::Version.
   // Optionally: Logs::SubscriptionFilter (when logDestination is set).
-  //
-  // This is the core abstraction. In serverless.yml each `functions:` entry
-  // became exactly these resources. In SAM, AWS::Serverless::Function
-  // expands to the same set.
-  lambdaFn(
+  lambdaFnG(
     logicalName,
     functionName,
     handler,
@@ -162,11 +171,9 @@
     } else {}),
 
 
-  // ── Schedule Event ─────────────────────────────────────────────────────────
+  // ── Schedule Event (G = group) ───────────────────────────────────────────
   // CloudWatch Events rule + Lambda permission.
-  // In SLS: events: - schedule: ...
-  // In SAM: Events: MySchedule: { Type: Schedule, ... }
-  scheduleEvent(logicalName, schedule, enabled=true, ruleName=null)::
+  scheduleEventG(logicalName, schedule, enabled=true, ruleName=null)::
     local fn   = logicalName + 'LambdaFunction';
     local rule = logicalName + 'EventsRuleSchedule1';
     local perm = logicalName + 'LambdaPermissionEventsRuleSchedule1';
@@ -195,33 +202,29 @@
 
 
   // ── SQS Queue ──────────────────────────────────────────────────────────────
-  sqsQueue(logicalName, visibilityTimeout=30, dlqArn=null, maxReceiveCount=3, tags=[]):: {
-    [logicalName]: {
-      Type: 'AWS::SQS::Queue',
-      Properties: {
-        VisibilityTimeout: visibilityTimeout,
-      }
-      + (if dlqArn != null then {
-        RedrivePolicy: { deadLetterTargetArn: dlqArn, maxReceiveCount: maxReceiveCount },
-      } else {})
-      + (if tags != [] then { Tags: tags } else {}),
-    },
+  // Returns a single resource value. Use as: { MyQueue: sls.sqsQueue(...) }
+  sqsQueue(visibilityTimeout=30, dlqArn=null, maxReceiveCount=3, tags=[]):: {
+    Type: 'AWS::SQS::Queue',
+    Properties: {
+      VisibilityTimeout: visibilityTimeout,
+    }
+    + (if dlqArn != null then {
+      RedrivePolicy: { deadLetterTargetArn: dlqArn, maxReceiveCount: maxReceiveCount },
+    } else {})
+    + (if tags != [] then { Tags: tags } else {}),
   },
 
 
   // ── SQS Event Source ───────────────────────────────────────────────────────
-  // In SLS: events: - sqs: ...
-  // In SAM: Events: MySqs: { Type: SQS, ... }
-  sqsEventSource(logicalName, functionLogical, queueLogical, batchSize=10):: {
-    [logicalName]: {
-      Type: 'AWS::Lambda::EventSourceMapping',
-      DependsOn: 'IamRoleLambdaExecution',
-      Properties: {
-        BatchSize: batchSize,
-        EventSourceArn: { 'Fn::GetAtt': [queueLogical, 'Arn'] },
-        FunctionName: { 'Fn::GetAtt': [functionLogical, 'Arn'] },
-        Enabled: 'True',
-      },
+  // Returns a single resource value.
+  sqsEventSource(functionLogical, queueLogical, batchSize=10):: {
+    Type: 'AWS::Lambda::EventSourceMapping',
+    DependsOn: 'IamRoleLambdaExecution',
+    Properties: {
+      BatchSize: batchSize,
+      EventSourceArn: { 'Fn::GetAtt': [queueLogical, 'Arn'] },
+      FunctionName: { 'Fn::GetAtt': [functionLogical, 'Arn'] },
+      Enabled: 'True',
     },
   },
 
@@ -238,111 +241,106 @@
     },
   },
 
-  apiResource(logicalName, parentId, pathPart):: {
-    [logicalName]: {
-      Type: 'AWS::ApiGateway::Resource',
-      Properties: {
-        ParentId: parentId,
-        PathPart: pathPart,
-        RestApiId: { Ref: 'ApiGatewayRestApi' },
-      },
+  // Returns a single resource value.
+  apiResource(parentId, pathPart):: {
+    Type: 'AWS::ApiGateway::Resource',
+    Properties: {
+      ParentId: parentId,
+      PathPart: pathPart,
+      RestApiId: { Ref: 'ApiGatewayRestApi' },
     },
   },
 
-  apiMethod(logicalName, resourceLogical, httpMethod, functionLogical, apiKeyRequired=false, authorizationType='NONE'):: {
-    [logicalName]: {
-      Type: 'AWS::ApiGateway::Method',
-      Properties: {
-        HttpMethod: httpMethod,
-        ResourceId: { Ref: resourceLogical },
-        RestApiId: { Ref: 'ApiGatewayRestApi' },
-        ApiKeyRequired: apiKeyRequired,
-        AuthorizationType: authorizationType,
-        RequestParameters: {},
-        MethodResponses: [],
-        Integration: {
-          IntegrationHttpMethod: 'POST',
-          Type: 'AWS_PROXY',
-          Uri: {
-            'Fn::Join': ['', [
-              'arn:', { Ref: 'AWS::Partition' },
-              ':apigateway:', { Ref: 'AWS::Region' },
-              ':lambda:path/2015-03-31/functions/',
-              { 'Fn::GetAtt': [functionLogical, 'Arn'] },
-              '/invocations',
-            ]],
-          },
-        },
-      },
-    },
-  },
-
-  corsOptions(logicalName, resourceLogical, allowedMethods)::
-    local methodsHeader = "'" + std.join(',', ['OPTIONS'] + allowedMethods) + "'";
-    {
-      [logicalName]: {
-        Type: 'AWS::ApiGateway::Method',
-        Properties: {
-          AuthorizationType: 'NONE',
-          HttpMethod: 'OPTIONS',
-          RequestParameters: {},
-          ResourceId: { Ref: resourceLogical },
-          RestApiId: { Ref: 'ApiGatewayRestApi' },
-          Integration: {
-            Type: 'MOCK',
-            RequestTemplates: { 'application/json': '{statusCode:200}' },
-            ContentHandling: 'CONVERT_TO_TEXT',
-            IntegrationResponses: [{
-              StatusCode: '200',
-              ResponseParameters: {
-                'method.response.header.Access-Control-Allow-Origin': "'*'",
-                'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
-                'method.response.header.Access-Control-Allow-Methods': methodsHeader,
-              },
-              ResponseTemplates: { 'application/json': '' },
-            }],
-          },
-          MethodResponses: [{
-            StatusCode: '200',
-            ResponseParameters: {
-              'method.response.header.Access-Control-Allow-Origin': true,
-              'method.response.header.Access-Control-Allow-Headers': true,
-              'method.response.header.Access-Control-Allow-Methods': true,
-            },
-            ResponseModels: {},
-          }],
-        },
-      },
-    },
-
-  apiLambdaPermission(logicalName, functionLogical):: {
-    [logicalName]: {
-      Type: 'AWS::Lambda::Permission',
-      Properties: {
-        FunctionName: { 'Fn::GetAtt': [functionLogical, 'Arn'] },
-        Action: 'lambda:InvokeFunction',
-        Principal: 'apigateway.amazonaws.com',
-        SourceArn: {
+  // Returns a single resource value.
+  apiMethod(resourceLogical, httpMethod, functionLogical, apiKeyRequired=false, authorizationType='NONE'):: {
+    Type: 'AWS::ApiGateway::Method',
+    Properties: {
+      HttpMethod: httpMethod,
+      ResourceId: { Ref: resourceLogical },
+      RestApiId: { Ref: 'ApiGatewayRestApi' },
+      ApiKeyRequired: apiKeyRequired,
+      AuthorizationType: authorizationType,
+      RequestParameters: {},
+      MethodResponses: [],
+      Integration: {
+        IntegrationHttpMethod: 'POST',
+        Type: 'AWS_PROXY',
+        Uri: {
           'Fn::Join': ['', [
             'arn:', { Ref: 'AWS::Partition' },
-            ':execute-api:', { Ref: 'AWS::Region' }, ':',
-            { Ref: 'AWS::AccountId' }, ':',
-            { Ref: 'ApiGatewayRestApi' }, '/*/*',
+            ':apigateway:', { Ref: 'AWS::Region' },
+            ':lambda:path/2015-03-31/functions/',
+            { 'Fn::GetAtt': [functionLogical, 'Arn'] },
+            '/invocations',
           ]],
         },
       },
     },
   },
 
-  apiDeployment(logicalName, stageName, dependsOn=[]):: {
-    [logicalName]: {
-      Type: 'AWS::ApiGateway::Deployment',
+  // Returns a single resource value.
+  corsOptions(resourceLogical, allowedMethods)::
+    local methodsHeader = "'" + std.join(',', ['OPTIONS'] + allowedMethods) + "'";
+    {
+      Type: 'AWS::ApiGateway::Method',
       Properties: {
+        AuthorizationType: 'NONE',
+        HttpMethod: 'OPTIONS',
+        RequestParameters: {},
+        ResourceId: { Ref: resourceLogical },
         RestApiId: { Ref: 'ApiGatewayRestApi' },
-        StageName: stageName,
+        Integration: {
+          Type: 'MOCK',
+          RequestTemplates: { 'application/json': '{statusCode:200}' },
+          ContentHandling: 'CONVERT_TO_TEXT',
+          IntegrationResponses: [{
+            StatusCode: '200',
+            ResponseParameters: {
+              'method.response.header.Access-Control-Allow-Origin': "'*'",
+              'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
+              'method.response.header.Access-Control-Allow-Methods': methodsHeader,
+            },
+            ResponseTemplates: { 'application/json': '' },
+          }],
+        },
+        MethodResponses: [{
+          StatusCode: '200',
+          ResponseParameters: {
+            'method.response.header.Access-Control-Allow-Origin': true,
+            'method.response.header.Access-Control-Allow-Headers': true,
+            'method.response.header.Access-Control-Allow-Methods': true,
+          },
+          ResponseModels: {},
+        }],
       },
-      DependsOn: dependsOn,
     },
+
+  // Returns a single resource value.
+  apiLambdaPermission(functionLogical):: {
+    Type: 'AWS::Lambda::Permission',
+    Properties: {
+      FunctionName: { 'Fn::GetAtt': [functionLogical, 'Arn'] },
+      Action: 'lambda:InvokeFunction',
+      Principal: 'apigateway.amazonaws.com',
+      SourceArn: {
+        'Fn::Join': ['', [
+          'arn:', { Ref: 'AWS::Partition' },
+          ':execute-api:', { Ref: 'AWS::Region' }, ':',
+          { Ref: 'AWS::AccountId' }, ':',
+          { Ref: 'ApiGatewayRestApi' }, '/*/*',
+        ]],
+      },
+    },
+  },
+
+  // Returns a single resource value.
+  apiDeployment(stageName, dependsOn=[]):: {
+    Type: 'AWS::ApiGateway::Deployment',
+    Properties: {
+      RestApiId: { Ref: 'ApiGatewayRestApi' },
+      StageName: stageName,
+    },
+    DependsOn: dependsOn,
   },
 
 
@@ -364,20 +362,20 @@
     },
   },
 
-  httpApiJwtAuthorizer(logicalName, name, issuer, audience):: {
-    [logicalName]: {
-      Type: 'AWS::ApiGatewayV2::Authorizer',
-      Properties: {
-        ApiId: { Ref: 'HttpApi' },
-        Name: name,
-        IdentitySource: ['$request.header.Authorization'],
-        AuthorizerType: 'JWT',
-        JwtConfiguration: { Audience: audience, Issuer: issuer },
-      },
+  // Returns a single resource value.
+  httpApiJwtAuthorizer(name, issuer, audience):: {
+    Type: 'AWS::ApiGatewayV2::Authorizer',
+    Properties: {
+      ApiId: { Ref: 'HttpApi' },
+      Name: name,
+      IdentitySource: ['$request.header.Authorization'],
+      AuthorizerType: 'JWT',
+      JwtConfiguration: { Audience: audience, Issuer: issuer },
     },
   },
 
-  httpApiFn(logicalName, functionLogical, routes)::
+  // HTTP API integration + routes + permission (G = group).
+  httpApiFnG(logicalName, functionLogical, routes)::
     local integrationLogical = 'HttpApiIntegration' + logicalName;
     local permissionLogical  = functionLogical + 'PermissionHttpApi';
     {

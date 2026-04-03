@@ -132,7 +132,7 @@ local sls = import 'sls.libsonnet';
         local ep = get(e, 'Properties', {});
         acc + (
           if e.Type == 'Schedule' then
-            sls.scheduleEvent(
+            sls.scheduleEventG(
               logicalName,
               get(ep, 'Schedule', get(ep, 'ScheduleExpression', '')),
               get(ep, 'Enabled', true),
@@ -140,13 +140,14 @@ local sls = import 'sls.libsonnet';
             )
           else if e.Type == 'SQS' then
             local arn = get(ep, 'Queue', get(ep, 'Arn'));
-            sls.sqsEventSource(
-              logicalName + eName + 'EventSourceMapping',
-              logicalName + 'LambdaFunction',
-              // If arn is a GetAtt reference, pass through; otherwise wrap
-              if std.isString(arn) then arn else arn,
-              get(ep, 'BatchSize', 10),
-            )
+            { [logicalName + eName + 'EventSourceMapping']:
+              sls.sqsEventSource(
+                logicalName + 'LambdaFunction',
+                // If arn is a GetAtt reference, pass through; otherwise wrap
+                if std.isString(arn) then arn else arn,
+                get(ep, 'BatchSize', 10),
+              ),
+            }
           // Api and HttpApi events are NOT expanded here — they're collected
           // and passed to the Api/HttpApi expander which handles the full
           // resource tree, CORS, deployment, and permissions.
@@ -170,7 +171,7 @@ local sls = import 'sls.libsonnet';
 
     {
       resources:
-        sls.lambdaFn(
+        sls.lambdaFnG(
           logicalName=logicalName,
           functionName=functionName,
           handler=handler,
@@ -262,17 +263,19 @@ local sls = import 'sls.libsonnet';
 
     // Resource tree
     local resourceResources = std.foldl(
-      function(acc, seg) acc + sls.apiResource(segLogical(seg), parentId(seg), lastPart(seg)),
+      function(acc, seg) acc + { [segLogical(seg)]: sls.apiResource(parentId(seg), lastPart(seg)) },
       allSegments, {}
     );
 
     // Methods
     local methodLogical(path, method) = 'ApiGatewayMethod' + pathToLogical(path) + titleCase(method);
     local methodResources = std.foldl(
-      function(acc, r) acc + sls.apiMethod(
-        methodLogical(r.path, r.method), segLogical(r.path),
-        r.method, r.functionLogical, apiKeyRequired=r.apiKeyRequired,
-      ),
+      function(acc, r) acc + { [methodLogical(r.path, r.method)]:
+        sls.apiMethod(
+          segLogical(r.path),
+          r.method, r.functionLogical, apiKeyRequired=r.apiKeyRequired,
+        ),
+      },
       allRoutes, {}
     );
 
@@ -280,9 +283,9 @@ local sls = import 'sls.libsonnet';
     local corsLogical(path) = 'ApiGatewayMethod' + pathToLogical(path) + 'Options';
     local methodsForPath(path) = [r.method for r in allRoutes if r.path == path];
     local corsResources = std.foldl(
-      function(acc, path) acc + sls.corsOptions(
-        corsLogical(path), segLogical(path), methodsForPath(path),
-      ),
+      function(acc, path) acc + { [corsLogical(path)]:
+        sls.corsOptions(segLogical(path), methodsForPath(path)),
+      },
       allPaths, {}
     );
 
@@ -294,7 +297,7 @@ local sls = import 'sls.libsonnet';
     // Lambda permissions (one per unique function)
     local uniqueFns = std.set([r.functionLogical for r in allRoutes]);
     local permResources = std.foldl(
-      function(acc, fl) acc + sls.apiLambdaPermission(fl + 'PermissionApiGateway', fl),
+      function(acc, fl) acc + { [fl + 'PermissionApiGateway']: sls.apiLambdaPermission(fl) },
       uniqueFns, {}
     );
 
@@ -307,7 +310,7 @@ local sls = import 'sls.libsonnet';
         + resourceResources
         + methodResources
         + corsResources
-        + sls.apiDeployment('ApiGatewayDeployment', stage, dependsOn=allMethodIds)
+        + { ApiGatewayDeployment: sls.apiDeployment(stage, dependsOn=allMethodIds) }
         + permResources
         + (if hasUsagePlan then {
           ApiGatewayApiKey1: {
@@ -357,12 +360,13 @@ local sls = import 'sls.libsonnet';
     local authResources = std.foldl(
       function(acc, aName)
         local a = authCfg[aName];
-        acc + sls.httpApiJwtAuthorizer(
-          'HttpApiAuthorizer' + titleCase(aName),
-          aName,
-          a.Issuer,
-          a.Audience,
-        ),
+        acc + { ['HttpApiAuthorizer' + titleCase(aName)]:
+          sls.httpApiJwtAuthorizer(
+            aName,
+            a.Issuer,
+            a.Audience,
+          ),
+        },
       std.objectFields(authCfg), {}
     );
 
@@ -382,7 +386,7 @@ local sls = import 'sls.libsonnet';
           for n in std.objectFields(fn.httpApiEvents)
         ];
         local fnName = std.strReplace(fn.functionLogical, 'LambdaFunction', '');
-        acc + sls.httpApiFn(fnName, fn.functionLogical, routes),
+        acc + sls.httpApiFnG(fnName, fn.functionLogical, routes),
       functions, {}
     );
 

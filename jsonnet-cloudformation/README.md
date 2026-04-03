@@ -153,7 +153,7 @@ The steps:
    in this article.
 
 3. **Factor out** each pattern into a library call. The 120-line Lambda triplet
-   becomes `sls.lambdaFn(...)`. The 50-line CORS OPTIONS mock becomes
+   becomes `sls.lambdaFnG(...)`. The 50-line CORS OPTIONS mock becomes
    `sls.corsOptions(...)`. Service-specific resources (DynamoDB tables, custom
    IAM statements) stay as inline Jsonnet objects.
 
@@ -232,8 +232,8 @@ local sls = import 'lib/sls.libsonnet';
   Resources:
     sls.deploymentBucket
     + sls.iamRole('my-service-dev', [...])
-    + sls.lambdaFn(logicalName='Worker', functionName='my-service-dev-worker', ...)
-    + sls.scheduleEvent('Worker', 'cron(0 3 * * ? *)'),
+    + sls.lambdaFnG(logicalName='Worker', functionName='my-service-dev-worker', ...)
+    + sls.scheduleEventG('Worker', 'cron(0 3 * * ? *)'),
 }
 ```
 
@@ -246,15 +246,15 @@ Each helper maps to what SLS/SAM auto-generated from a high-level declaration:
 
 | SLS / SAM concept | Library helper | CFN resources generated |
 |---|---|---|
-| `functions:` entry | `sls.lambdaFn(...)` | LogGroup + Function + Version |
-| `events: - schedule:` | `sls.scheduleEvent(...)` | Events::Rule + Lambda::Permission |
+| `functions:` entry | `sls.lambdaFnG(...)` | LogGroup + Function + Version |
+| `events: - schedule:` | `sls.scheduleEventG(...)` | Events::Rule + Lambda::Permission |
 | `events: - sqs:` | `sls.sqsEventSource(...)` | Lambda::EventSourceMapping |
 | `events: - http:` | `sls.apiMethod(...)` + `sls.corsOptions(...)` | Method + CORS OPTIONS mock |
-| `events: - httpApi:` | `sls.httpApiFn(...)` | Integration + Routes + Permission |
+| `events: - httpApi:` | `sls.httpApiFnG(...)` | Integration + Routes + Permission |
 | `provider.iamRoleStatements` | `sls.iamRole(...)` | IAM::Role with scoped log perms |
 | `provider.apiKeys` | (manual) | ApiKey + UsagePlan + UsagePlanKey |
 | implicit | `sls.deploymentBucket` | S3::Bucket + BucketPolicy |
-| SLS log-subscription plugin | `sls.lambdaFn(..., logDestination=...)` | Logs::SubscriptionFilter |
+| SLS log-subscription plugin | `sls.lambdaFnG(..., logDestination=...)` | Logs::SubscriptionFilter |
 
 ## Examples
 
@@ -357,7 +357,7 @@ it auto-generates the API Gateway resource tree from event declarations.
 Every helper is a Jsonnet function that returns a plain object:
 
 ```jsonnet
-lambdaFn(logicalName='Worker', functionName='svc-dev-worker', handler='h.main', ...)
+lambdaFnG(logicalName='Worker', functionName='svc-dev-worker', handler='h.main', ...)
 // returns:
 // {
 //   WorkerLogGroup: { Type: 'AWS::Logs::LogGroup', ... },
@@ -366,18 +366,27 @@ lambdaFn(logicalName='Worker', functionName='svc-dev-worker', handler='h.main', 
 // }
 ```
 
-Objects are merged with `+`:
+Functions ending in **G** (for "group") return `{ LogicalId: Resource, ... }`
+objects containing multiple resources — merge them with `+`. All other
+functions return a single resource value, used as `{ LogicalId: sls.helper(...) }`:
 
 ```jsonnet
 Resources:
-  sls.deploymentBucket           // S3 bucket + policy
-  + sls.iamRole(...)             // IAM role
-  + sls.lambdaFn(...)            // LogGroup + Function + Version
-  + sls.scheduleEvent(...)       // Events::Rule + Permission
+  sls.deploymentBucket              // S3 bucket + policy (fixed keys)
+  + sls.iamRole(...)                // IAM role (fixed key)
+  + sls.lambdaFnG(...)             // LogGroup + Function + Version
+  + sls.scheduleEventG(...)        // Events::Rule + Permission
+  + {
+    OrderDLQ: sls.sqsQueue(...),   // single resource — key is the CFN logical ID
+    OrderQueue: sls.sqsQueue(...),
+  }
 ```
 
-This is the key design: each helper is independent, there's no hidden state,
-and the output is a flat resource map that CloudFormation consumes directly.
+The G functions expand a name prefix into multiple derived resource keys.
+Single-resource helpers return bare values, so the logical ID is visible in
+your source — matching the CloudFormation output. Each helper is independent,
+there's no hidden state, and the output is a flat resource map that
+CloudFormation consumes directly.
 
 ### Custom abstractions
 
@@ -397,7 +406,7 @@ local standardTags(service, stage) = {
 };
 
 // Apply to every resource that supports tags:
-lambdaFn(logicalName, functionName, handler, ..., tags=standardTags(service, stage))
+lambdaFnG(logicalName, functionName, handler, ..., tags=standardTags(service, stage))
 ```
 
 Another example: CloudFormation intrinsic functions like `Fn::GetAtt` and
@@ -425,7 +434,7 @@ a shared library as a mixin that you merge alongside the Lambda:
 // lib/company.libsonnet — shared abstractions across all services
 {
   // Returns a SubscriptionFilter resource that forwards a Lambda's logs
-  // to the central Firehose. Merge with `+` next to sls.lambdaFn().
+  // to the central Firehose. Merge with `+` next to sls.lambdaFnG().
   logForwarding(logicalName, functionName, firehoseArn, roleArn):: {
     [logicalName + 'LogSubscription']: {
       Type: 'AWS::Logs::SubscriptionFilter',
@@ -447,12 +456,12 @@ Services compose it with `+`, just like any other resource block:
 local co = import 'lib/company.libsonnet';
 
 Resources:
-  sls.lambdaFn(logicalName='Worker', functionName=fnName, ...)
+  sls.lambdaFnG(logicalName='Worker', functionName=fnName, ...)
   + co.logForwarding('Worker', fnName, firehoseArn, logRoleArn)
-  + sls.scheduleEvent('Worker', 'cron(0 3 * * ? *)'),
+  + sls.scheduleEventG('Worker', 'cron(0 3 * * ? *)'),
 ```
 
-No wrapping, no override — `sls.lambdaFn` stays untouched and the mixin is
+No wrapping, no override — `sls.lambdaFnG` stays untouched and the mixin is
 just another object merged in. This is the same pattern CDK teams achieve with
 custom constructs, but the abstraction is a pure data transformation: you can
 print the output, diff it, and reason about it without running anything.
@@ -620,7 +629,7 @@ The three libraries complement each other:
   function shorthands (`getAtt`, `sub`, `ref`), IAM policy builders (`allow`,
   `deny`, `policies`), parameter and output helpers, and tag conversion.
 - **`sls.libsonnet`** — serverless resource builders, one per CFN resource
-  pattern: `lambdaFn`, `iamRole`, `deploymentBucket`, API Gateway, SQS, and
+  pattern: `lambdaFnG`, `iamRole`, `deploymentBucket`, API Gateway, SQS, and
   schedule event wiring. You wire resources together explicitly. Maximum control.
 - **`sam.libsonnet`** — high-level SAM-shaped interface. Events are declared
   inline, API resource trees are generated automatically. Calls `sls.libsonnet`

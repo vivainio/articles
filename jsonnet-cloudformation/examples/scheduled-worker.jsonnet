@@ -39,7 +39,7 @@ local tags = cfn.tags({ Service: service, Stage: stage });
     + sls.iamRole(service + '-' + stage, [
       cfn.allow(['ec2:DescribeSnapshots', 'ec2:DeleteSnapshot'], '*'),
     ])
-    + sls.lambdaFn(
+    + sls.lambdaFnG(
       logicalName='Worker',
       functionName=service + '-' + stage + '-worker',
       handler='handler.cleanup',
@@ -49,7 +49,7 @@ local tags = cfn.tags({ Service: service, Stage: stage });
       timeout=600,
       tags=tags,
     )
-    + sls.scheduleEvent('Worker', 'cron(0 3 * * ? *)', enabled=true),
+    + sls.scheduleEventG('Worker', 'cron(0 3 * * ? *)', enabled=true),
 
   Outputs: {
     WorkerFunctionArn: cfn.output(cfn.getAtt('WorkerLambdaFunction', 'Arn')),

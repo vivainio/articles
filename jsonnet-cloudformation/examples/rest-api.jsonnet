@@ -64,7 +64,7 @@ local methods = [
     ])
 
     // Single Lambda function serving all routes
-    + sls.lambdaFn(
+    + sls.lambdaFnG(
       logicalName='Api',
       functionName=service + '-' + stage + '-api',
       handler='wsgi_handler.handler',
@@ -76,24 +76,26 @@ local methods = [
     // REST API
     + sls.restApi(stage + '-' + service)
 
-    // Resource tree: /todos and /todos/{id}
-    + sls.apiResource(r.todos,  cfn.getAtt('ApiGatewayRestApi', 'RootResourceId'), 'todos')
-    + sls.apiResource(r.todoId, cfn.ref(r.todos), '{id}')
+    + {
+      // Resource tree: /todos and /todos/{id}
+      [r.todos]:  sls.apiResource(cfn.getAtt('ApiGatewayRestApi', 'RootResourceId'), 'todos'),
+      [r.todoId]: sls.apiResource(cfn.ref(r.todos), '{id}'),
 
-    // Methods on /todos
-    + sls.apiMethod('ApiGatewayMethodTodosGet',  r.todos, 'GET',  fn, apiKeyRequired=true)
-    + sls.apiMethod('ApiGatewayMethodTodosPost', r.todos, 'POST', fn, apiKeyRequired=true)
-    + sls.corsOptions('ApiGatewayMethodTodosOptions', r.todos, ['GET', 'POST'])
+      // Methods on /todos
+      ApiGatewayMethodTodosGet:  sls.apiMethod(r.todos, 'GET',  fn, apiKeyRequired=true),
+      ApiGatewayMethodTodosPost: sls.apiMethod(r.todos, 'POST', fn, apiKeyRequired=true),
+      ApiGatewayMethodTodosOptions: sls.corsOptions(r.todos, ['GET', 'POST']),
 
-    // Methods on /todos/{id}
-    + sls.apiMethod('ApiGatewayMethodTodosIdVarGet',    r.todoId, 'GET',    fn, apiKeyRequired=true)
-    + sls.apiMethod('ApiGatewayMethodTodosIdVarPut',    r.todoId, 'PUT',    fn, apiKeyRequired=true)
-    + sls.apiMethod('ApiGatewayMethodTodosIdVarDelete', r.todoId, 'DELETE', fn, apiKeyRequired=true)
-    + sls.corsOptions('ApiGatewayMethodTodosIdVarOptions', r.todoId, ['GET', 'PUT', 'DELETE'])
+      // Methods on /todos/{id}
+      ApiGatewayMethodTodosIdVarGet:    sls.apiMethod(r.todoId, 'GET',    fn, apiKeyRequired=true),
+      ApiGatewayMethodTodosIdVarPut:    sls.apiMethod(r.todoId, 'PUT',    fn, apiKeyRequired=true),
+      ApiGatewayMethodTodosIdVarDelete: sls.apiMethod(r.todoId, 'DELETE', fn, apiKeyRequired=true),
+      ApiGatewayMethodTodosIdVarOptions: sls.corsOptions(r.todoId, ['GET', 'PUT', 'DELETE']),
 
-    // Deployment + permission
-    + sls.apiDeployment('ApiGatewayDeployment', stage, dependsOn=methods)
-    + sls.apiLambdaPermission('ApiLambdaPermissionApiGateway', fn),
+      // Deployment + permission
+      ApiGatewayDeployment: sls.apiDeployment(stage, dependsOn=methods),
+      ApiLambdaPermissionApiGateway: sls.apiLambdaPermission(fn),
+    },
 
   Outputs: {
     ServiceEndpoint: cfn.output(cfn.sub('https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/' + stage)),

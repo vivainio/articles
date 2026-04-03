@@ -58,13 +58,15 @@ local processor = sam.Function('Processor', {
     sls.deploymentBucket
     + sls.iamRole(service + '-' + stage, processor.extraStatements)
     + processor.resources
-    + sls.sqsQueue('OrderDLQ', tags=tags)
-    + sls.sqsQueue('OrderQueue',
-      visibilityTimeout=180,
-      dlqArn=cfn.getAtt('OrderDLQ', 'Arn'),
-      maxReceiveCount=3,
-      tags=tags,
-    ),
+    + {
+      OrderDLQ: sls.sqsQueue(tags=tags),
+      OrderQueue: sls.sqsQueue(
+        visibilityTimeout=180,
+        dlqArn=cfn.getAtt('OrderDLQ', 'Arn'),
+        maxReceiveCount=3,
+        tags=tags,
+      ),
+    },
   Outputs: {
     QueueUrl: cfn.output(cfn.ref('OrderQueue')),
     DLQUrl:   cfn.output(cfn.ref('OrderDLQ')),
