@@ -20,7 +20,7 @@ local bucket = service + '-' + stage + '-data';
       FunctionName: service + '-' + stage + '-app',
       Handler: 'app.handler',
       Code: { S3Bucket: 'deploy-artifacts', S3Key: service + '/' + stage + '/package.zip' },
-      Role: cfn.getAtt('AppRole', 'Arn'),
+      Role: cfn.getArn('AppRole'),
       Environment: { Variables: { TABLE: table, BUCKET: bucket } },
     })
     + {
@@ -34,7 +34,7 @@ local bucket = service + '-' + stage + '-data';
     },
 
   Outputs: {
-    FunctionArn: cfn.output(cfn.getAtt('AppFunction', 'Arn')),
+    FunctionArn: cfn.output(cfn.getArn('AppFunction')),
     TableName: cfn.output(cfn.ref('DataTable')),
     BucketName: cfn.output(cfn.ref('DataBucket')),
   },

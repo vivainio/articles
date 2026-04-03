@@ -11,6 +11,7 @@
 {
   // ── Intrinsic function shorthands ─────────────────────────────────────────
   getAtt(logical, attr):: { 'Fn::GetAtt': [logical, attr] },
+  getArn(logical):: { 'Fn::GetAtt': [logical, 'Arn'] },
   sub(str):: { 'Fn::Sub': str },
   ref(logical):: { Ref: logical },
 
