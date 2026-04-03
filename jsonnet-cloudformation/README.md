@@ -41,8 +41,12 @@ need a Node runtime image, `npx cdk` bootstrapping, and CDK-specific IAM
 permissions. For teams whose Lambda functions are Python or C#, maintaining a
 Node toolchain (plus the Python/C# toolchain you actually chose) solely for
 the deployment layer is overhead that never pays for itself. CDK also
-generates CloudFormation with machine-generated logical IDs (hashes), making
-diffs and troubleshooting harder than hand-written templates. CDK shines when
+generates CloudFormation with machine-generated logical IDs (hashes like
+`MyFunctionServiceRole3AC7B20E`), deeply nested metadata blocks, and
+CDK-internal parameters that make the synthesized template nearly unreadable.
+Reviewing a `cdk diff` in a pull request means staring at hundreds of lines of
+machine-generated JSON that no human authored — you're trusting the abstraction
+rather than reviewing the infrastructure. CDK shines when
 you have large, complex infrastructure with dozens of interdependent resources
 — but for typical serverless stacks (a few Lambdas, an API Gateway, some
 queues), it's overkill.
