@@ -133,31 +133,38 @@ From the template, identify:
 
 ### Step 3: Choose the library level
 
-**Use `sls.libsonnet` (low-level) when:**
-- The template has a custom IAM role structure (not the standard SLS-generated one)
-- Resources have unusual DependsOn chains or Conditions
-- The user wants maximum control over logical IDs (e.g. migrating an existing stack in-place)
+Three libraries are available, each at a different abstraction level:
 
-**Use `sam.libsonnet` (high-level) when:**
+**Use `aws.libsonnet` (clean-room) when:**
+- The user is not migrating an existing stack in-place (no logical ID preservation needed)
+- The template has custom IAM roles (not the standard SLS-generated shared role)
+- The user wants a chainable builder API: `aws.lambda()` returns an object with
+  `.routes()`, `.schedule()`, `.sqsSource()`, `.logSubscription()` methods
+- HTTP API v2 with JWT auth maps cleanly to `aws.httpApiG()` + `aws.jwtAuthorizer()`
+  + the lambda builder's `.routes()` method
+
+**Use `sls.libsonnet` (SLS-compatible) when:**
+- Migrating an existing SLS stack in-place — logical IDs match SLS conventions
+  (`IamRoleLambdaExecution`, `ServerlessDeploymentBucket`, `{Prefix}LambdaFunction`)
+- The template uses the standard SLS pattern (one shared IAM role, deployment bucket)
+- Resources have unusual DependsOn chains or Conditions that need explicit wiring
+
+**Use `sam.libsonnet` (SAM-shaped input) when:**
 - The template follows the standard SLS/SAM pattern (one role, functions with events)
 - The user prefers conciseness over explicit control
 - The user is familiar with SAM concepts (Events inside Functions)
 
 ### Step 4: Write the Jsonnet file
 
-Structure the output as:
+**With `sls.libsonnet`** (preserves SLS logical IDs):
 
 ```jsonnet
 local cfn = import 'lib/cfn.libsonnet';
-local sls = import 'lib/sls.libsonnet';  // or sam
+local sls = import 'lib/sls.libsonnet';
 
 local service = '{extracted service name}';
 local stage   = std.extVar('stage');
-
-// Tags shared across all resources
 local tags = cfn.tags({ ... });
-
-// Extra IAM statements (beyond base log permissions)
 local extraStatements = [ ... ];
 
 {
@@ -167,6 +174,41 @@ local extraStatements = [ ... ];
     + sls.iamRoleG(service + '-' + stage, extraStatements)
     + sls.lambdaFnG(...)
     + ...remaining resources...,
+  Outputs: { ... },
+}
+```
+
+**With `aws.libsonnet`** (clean logical IDs, chainable builders):
+
+```jsonnet
+local cfn = import 'lib/cfn.libsonnet';
+local aws = import 'lib/aws.libsonnet';
+
+local service = '{extracted service name}';
+local stage   = std.extVar('stage');
+local tags = cfn.tags({ ... });
+
+local app = aws.lambda('App', {
+  FunctionName: service + '-' + stage + '-app',
+  Handler: 'wsgi_handler.handler',
+  Code: { S3Bucket: '...', S3Key: '...' },
+  Role: cfn.getArn('AppRole'),
+  Tags: tags,
+});
+
+{
+  AWSTemplateFormatVersion: '2010-09-09',
+  Resources:
+    app.resources
+    + app.routes('Api', {
+        Default: { routeKey: '$default', authorizerId: cfn.ref('ApiAuth') },
+      })
+    + app.schedule('Cleanup', 'cron(0 3 * * ? *)')
+    + aws.httpApiG('Api', service + '-' + stage)
+    + {
+        ApiAuth: aws.jwtAuthorizer('Api', 'jwt', issuer, audience),
+        AppRole: aws.lambdaRole(service + '-' + stage, extraStatements),
+      },
   Outputs: { ... },
 }
 ```
