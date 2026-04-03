@@ -11,7 +11,8 @@
 //     a { LogicalId: sls.helper(...) } object — the logical ID is visible
 //     in your source, matching the CFN output.
 //   - deploymentBucket, iamRole, restApi, httpApi have fixed well-known keys
-//     and merge with `+`.
+//     and merge with `+`. These assume one per template, matching the SLS
+//     one-service-per-stack convention.
 //
 // Usage:
 //   local sls = import 'lib/sls.libsonnet';
