@@ -74,7 +74,10 @@ is a single ~2MB executable with no runtime dependencies. Compilation is
 instant. Jsonnet is already widely used for generating Kubernetes manifests
 (via [Tanka](https://tanka.dev/) and ksonnet) — templating large, repetitive
 JSON/YAML configurations is exactly what it was designed for, and
-CloudFormation is the same kind of problem.
+CloudFormation is the same kind of problem. The official
+[tutorial](https://jsonnet.org/learning/tutorial.html) is a good starting
+point for learning the language, though you may want to skip it if you're a
+recovering alcoholic — the reasons will become clear once you visit.
 
 Jsonnet gives you the same power of abstraction as CDK — functions, local
 variables, imports, conditionals, array comprehensions, object merging — but
