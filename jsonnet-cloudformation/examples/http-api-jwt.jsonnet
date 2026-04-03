@@ -26,12 +26,12 @@
 //         - httpApi: { method: GET,    path: /users,       authorizer: auth0 }
 //         - httpApi: { method: POST,   path: /users,       authorizer: auth0 }
 
+local actions = import '../lib/cfn-actions.libsonnet';
 local cfn = import '../lib/cfn.libsonnet';
 local sls = import '../lib/sls.libsonnet';
-local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'user-api';
-local stage   = std.extVar('stage');
+local stage = std.extVar('stage');
 local tags = cfn.tags({ Service: service, Stage: stage });
 
 local authorizerLogical = 'HttpApiAuthorizerAuth0';
@@ -67,11 +67,11 @@ local authRef = cfn.ref(authorizerLogical);
 
     // Integration + routes + permission (all in one call)
     + sls.httpApiFnG('Api', 'ApiLambdaFunction', [
-      { logical: 'HttpApiRouteGetUsersIdVar',    routeKey: 'GET /users/{id}',    authorizerId: authRef },
-      { logical: 'HttpApiRoutePutUsersIdVar',    routeKey: 'PUT /users/{id}',    authorizerId: authRef },
+      { logical: 'HttpApiRouteGetUsersIdVar', routeKey: 'GET /users/{id}', authorizerId: authRef },
+      { logical: 'HttpApiRoutePutUsersIdVar', routeKey: 'PUT /users/{id}', authorizerId: authRef },
       { logical: 'HttpApiRouteDeleteUsersIdVar', routeKey: 'DELETE /users/{id}', authorizerId: authRef },
-      { logical: 'HttpApiRouteGetUsers',         routeKey: 'GET /users',         authorizerId: authRef },
-      { logical: 'HttpApiRoutePostUsers',        routeKey: 'POST /users',        authorizerId: authRef },
+      { logical: 'HttpApiRouteGetUsers', routeKey: 'GET /users', authorizerId: authRef },
+      { logical: 'HttpApiRoutePostUsers', routeKey: 'POST /users', authorizerId: authRef },
     ]),
 
   Outputs: {

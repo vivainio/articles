@@ -91,21 +91,22 @@ local cfn = import 'cfn.libsonnet';
         + std.foldl(
           function(acc, name)
             local r = routeMap[name];
-            acc + {
+            acc {
               [prefix + name + 'Route']: {
                 Type: 'AWS::ApiGatewayV2::Route',
                 Properties: {
-                  ApiId: cfn.ref(apiLogical),
-                  RouteKey: r.routeKey,
-                  Target: cfn.sub('integrations/${' + integLogical + '}'),
-                }
-                + (if std.objectHas(r, 'authorizerId') && r.authorizerId != null then {
-                  AuthorizationType: 'JWT',
-                  AuthorizerId: r.authorizerId,
-                } else {}),
+                              ApiId: cfn.ref(apiLogical),
+                              RouteKey: r.routeKey,
+                              Target: cfn.sub('integrations/${' + integLogical + '}'),
+                            }
+                            + (if std.objectHas(r, 'authorizerId') && r.authorizerId != null then {
+                                 AuthorizationType: 'JWT',
+                                 AuthorizerId: r.authorizerId,
+                               } else {}),
               },
             },
-          routeNames, {}
+          routeNames,
+          {}
         )
         + {
           [prefix + apiLogical + 'Permission']: {
@@ -172,22 +173,22 @@ local cfn = import 'cfn.libsonnet';
   serviceRole(service, statements=[], managedPolicies=[]):: {
     Type: 'AWS::IAM::Role',
     Properties: {
-      AssumeRolePolicyDocument: {
-        Version: '2012-10-17',
-        Statement: [{
-          Effect: 'Allow',
-          Principal: { Service: service },
-          Action: 'sts:AssumeRole',
-        }],
-      },
-    }
-    + (if statements != [] then {
-      Policies: [{
-        PolicyName: 'policy',
-        PolicyDocument: { Version: '2012-10-17', Statement: statements },
-      }],
-    } else {})
-    + (if managedPolicies != [] then { ManagedPolicyArns: managedPolicies } else {}),
+                  AssumeRolePolicyDocument: {
+                    Version: '2012-10-17',
+                    Statement: [{
+                      Effect: 'Allow',
+                      Principal: { Service: service },
+                      Action: 'sts:AssumeRole',
+                    }],
+                  },
+                }
+                + (if statements != [] then {
+                     Policies: [{
+                       PolicyName: 'policy',
+                       PolicyDocument: { Version: '2012-10-17', Statement: statements },
+                     }],
+                   } else {})
+                + (if managedPolicies != [] then { ManagedPolicyArns: managedPolicies } else {}),
   },
 
   // ── Assumable role ─────────────────────────────────────────────────────────
@@ -196,22 +197,22 @@ local cfn = import 'cfn.libsonnet';
   assumableRole(principals, statements=[], condition=null, managedPolicies=[]):: {
     Type: 'AWS::IAM::Role',
     Properties: {
-      AssumeRolePolicyDocument: {
-        Version: '2012-10-17',
-        Statement: [{
-          Effect: 'Allow',
-          Principal: { AWS: principals },
-          Action: 'sts:AssumeRole',
-        } + (if condition != null then { Condition: condition } else {})],
-      },
-    }
-    + (if statements != [] then {
-      Policies: [{
-        PolicyName: 'policy',
-        PolicyDocument: { Version: '2012-10-17', Statement: statements },
-      }],
-    } else {})
-    + (if managedPolicies != [] then { ManagedPolicyArns: managedPolicies } else {}),
+                  AssumeRolePolicyDocument: {
+                    Version: '2012-10-17',
+                    Statement: [{
+                      Effect: 'Allow',
+                      Principal: { AWS: principals },
+                      Action: 'sts:AssumeRole',
+                    } + (if condition != null then { Condition: condition } else {})],
+                  },
+                }
+                + (if statements != [] then {
+                     Policies: [{
+                       PolicyName: 'policy',
+                       PolicyDocument: { Version: '2012-10-17', Statement: statements },
+                     }],
+                   } else {})
+                + (if managedPolicies != [] then { ManagedPolicyArns: managedPolicies } else {}),
   },
 
   // ── Lambda execution role ────────────────────────────────────────────────
@@ -329,14 +330,14 @@ local cfn = import 'cfn.libsonnet';
     [prefix + 'Route']: {
       Type: 'AWS::ApiGatewayV2::Route',
       Properties: {
-        ApiId: cfn.ref(apiLogical),
-        RouteKey: routeKey,
-        Target: cfn.sub('integrations/${' + prefix + 'Integration}'),
-      }
-      + (if authorizerId != null then {
-        AuthorizationType: 'JWT',
-        AuthorizerId: authorizerId,
-      } else {}),
+                    ApiId: cfn.ref(apiLogical),
+                    RouteKey: routeKey,
+                    Target: cfn.sub('integrations/${' + prefix + 'Integration}'),
+                  }
+                  + (if authorizerId != null then {
+                       AuthorizationType: 'JWT',
+                       AuthorizerId: authorizerId,
+                     } else {}),
     },
     [prefix + 'Permission']: {
       Type: 'AWS::Lambda::Permission',

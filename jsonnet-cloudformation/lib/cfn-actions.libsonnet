@@ -6,18 +6,18 @@
 
 {
   // ── DynamoDB ──────────────────────────────────────────────────────────────
-  ddbRead:  ['dynamodb:GetItem', 'dynamodb:Query', 'dynamodb:Scan', 'dynamodb:BatchGetItem'],
+  ddbRead: ['dynamodb:GetItem', 'dynamodb:Query', 'dynamodb:Scan', 'dynamodb:BatchGetItem'],
   ddbWrite: ['dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:DeleteItem', 'dynamodb:BatchWriteItem'],
-  ddbAll:   self.ddbRead + self.ddbWrite,
+  ddbAll: self.ddbRead + self.ddbWrite,
 
   // ── SQS ───────────────────────────────────────────────────────────────────
   sqsConsume: ['sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:GetQueueAttributes'],
-  sqsSend:    ['sqs:SendMessage', 'sqs:GetQueueUrl'],
+  sqsSend: ['sqs:SendMessage', 'sqs:GetQueueUrl'],
 
   // ── S3 ────────────────────────────────────────────────────────────────────
-  s3Read:  ['s3:GetObject', 's3:HeadObject'],
+  s3Read: ['s3:GetObject', 's3:HeadObject'],
   s3Write: ['s3:PutObject', 's3:DeleteObject'],
-  s3List:  ['s3:ListBucket'],
+  s3List: ['s3:ListBucket'],
 
   // ── SNS ───────────────────────────────────────────────────────────────────
   snsPublish: ['sns:Publish'],

@@ -11,9 +11,9 @@
 //     --parameter-overrides Stage=dev VpcId=vpc-0abc1234 \
 //     --capabilities CAPABILITY_NAMED_IAM
 
+local actions = import '../lib/cfn-actions.libsonnet';
 local cfn = import '../lib/cfn.libsonnet';
 local sls = import '../lib/sls.libsonnet';
-local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'data-processor';
 

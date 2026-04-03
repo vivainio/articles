@@ -38,13 +38,13 @@
 //         Auth:
 //           UsagePlan: { CreateUsagePlan: PER_API }
 
-local sam = import '../lib/sam.libsonnet';
-local cfn = import '../lib/cfn.libsonnet';
-local sls = import '../lib/sls.libsonnet';
 local actions = import '../lib/cfn-actions.libsonnet';
+local cfn = import '../lib/cfn.libsonnet';
+local sam = import '../lib/sam.libsonnet';
+local sls = import '../lib/sls.libsonnet';
 
 local service = 'todo-api';
-local stage   = std.extVar('stage');
+local stage = std.extVar('stage');
 
 // ── Globals ──────────────────────────────────────────────────────────────────
 local globals = {
@@ -64,11 +64,11 @@ local apiHandler = sam.Function('Api', {
     cfn.allow(actions.ddbRead + actions.ddbWrite, cfn.arn('dynamodb', 'table/todos-' + stage)),
   ]),
   Events: {
-    GetTodos:    { Type: 'Api', Properties: { Path: '/todos',      Method: 'get',    Auth: { ApiKeyRequired: true } } },
-    PostTodos:   { Type: 'Api', Properties: { Path: '/todos',      Method: 'post',   Auth: { ApiKeyRequired: true } } },
-    GetTodo:     { Type: 'Api', Properties: { Path: '/todos/{id}', Method: 'get',    Auth: { ApiKeyRequired: true } } },
-    PutTodo:     { Type: 'Api', Properties: { Path: '/todos/{id}', Method: 'put',    Auth: { ApiKeyRequired: true } } },
-    DeleteTodo:  { Type: 'Api', Properties: { Path: '/todos/{id}', Method: 'delete', Auth: { ApiKeyRequired: true } } },
+    GetTodos: { Type: 'Api', Properties: { Path: '/todos', Method: 'get', Auth: { ApiKeyRequired: true } } },
+    PostTodos: { Type: 'Api', Properties: { Path: '/todos', Method: 'post', Auth: { ApiKeyRequired: true } } },
+    GetTodo: { Type: 'Api', Properties: { Path: '/todos/{id}', Method: 'get', Auth: { ApiKeyRequired: true } } },
+    PutTodo: { Type: 'Api', Properties: { Path: '/todos/{id}', Method: 'put', Auth: { ApiKeyRequired: true } } },
+    DeleteTodo: { Type: 'Api', Properties: { Path: '/todos/{id}', Method: 'delete', Auth: { ApiKeyRequired: true } } },
   },
 }, globals=globals.Function, service=service, stage=stage);
 

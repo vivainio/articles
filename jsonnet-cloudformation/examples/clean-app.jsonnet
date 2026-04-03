@@ -3,9 +3,9 @@
 // Uses aws.libsonnet — no Serverless Framework conventions, no fixed
 // logical IDs, no deployment bucket. Every resource name is explicit.
 
-local cfn = import '../lib/cfn.libsonnet';
 local aws = import '../lib/aws.libsonnet';
 local actions = import '../lib/cfn-actions.libsonnet';
+local cfn = import '../lib/cfn.libsonnet';
 
 local service = 'my-app';
 local stage = std.extVar('stage');

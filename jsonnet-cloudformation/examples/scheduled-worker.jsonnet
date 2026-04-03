@@ -28,7 +28,7 @@ local cfn = import '../lib/cfn.libsonnet';
 local sls = import '../lib/sls.libsonnet';
 
 local service = 'snapshot-cleanup';
-local stage   = std.extVar('stage');
+local stage = std.extVar('stage');
 local tags = cfn.tags({ Service: service, Stage: stage });
 
 {

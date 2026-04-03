@@ -17,6 +17,7 @@ def main():
     examples_dir = Path(__file__).parent
 
     for f in sorted(examples_dir.glob("*.jsonnet")):
+        subprocess.run(["jsonnetfmt", "-i", str(f)], check=True)
         out = f.with_suffix(".yaml")
         print(f"{f.name} → {out.name}")
         result = subprocess.run(

@@ -30,12 +30,12 @@
 //       OrderDLQ: ...
 //       OrderQueue: ...
 
+local actions = import '../lib/cfn-actions.libsonnet';
 local cfn = import '../lib/cfn.libsonnet';
 local sls = import '../lib/sls.libsonnet';
-local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'order-processor';
-local stage   = std.extVar('stage');
+local stage = std.extVar('stage');
 
 local tags = cfn.tags({
   Service: service,
@@ -83,6 +83,6 @@ local tags = cfn.tags({
 
   Outputs: {
     QueueUrl: cfn.output(cfn.ref('OrderQueue')),
-    DLQUrl:   cfn.output(cfn.ref('OrderDLQ')),
+    DLQUrl: cfn.output(cfn.ref('OrderDLQ')),
   },
 }

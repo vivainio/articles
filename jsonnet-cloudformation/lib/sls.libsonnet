@@ -110,8 +110,8 @@
   //   Runtime: python3.12, MemorySize: 128, Timeout: 300,
   //   Role: IamRoleLambdaExecution, Code.S3Bucket: ServerlessDeploymentBucket.
   lambdaFnG(logicalName, props, logDestination=null)::
-    local lg  = logicalName + 'LogGroup';
-    local fn  = logicalName + 'LambdaFunction';
+    local lg = logicalName + 'LogGroup';
+    local fn = logicalName + 'LambdaFunction';
     local ver = logicalName + 'LambdaVersion';
     local sub = logicalName + 'LogSubscriptionFilter';
     local functionName = props.FunctionName;
@@ -150,22 +150,22 @@
       },
     }
     + (if logDestination != null then {
-      [sub]: {
-        Type: 'AWS::Logs::SubscriptionFilter',
-        DependsOn: [lg],
-        Properties: {
-          LogGroupName: '/aws/lambda/' + functionName,
-          FilterPattern: '',
-          DestinationArn: logDestination,
-        },
-      },
-    } else {}),
+         [sub]: {
+           Type: 'AWS::Logs::SubscriptionFilter',
+           DependsOn: [lg],
+           Properties: {
+             LogGroupName: '/aws/lambda/' + functionName,
+             FilterPattern: '',
+             DestinationArn: logDestination,
+           },
+         },
+       } else {}),
 
 
   // ── Schedule Event (G = group) ───────────────────────────────────────────
   // CloudWatch Events rule + Lambda permission.
   scheduleEventG(logicalName, schedule, enabled=true, ruleName=null)::
-    local fn   = logicalName + 'LambdaFunction';
+    local fn = logicalName + 'LambdaFunction';
     local rule = logicalName + 'EventsRuleSchedule1';
     local perm = logicalName + 'LambdaPermissionEventsRuleSchedule1';
     {
@@ -197,12 +197,12 @@
   sqsQueue(visibilityTimeout=30, dlqArn=null, maxReceiveCount=3, tags=[]):: {
     Type: 'AWS::SQS::Queue',
     Properties: {
-      VisibilityTimeout: visibilityTimeout,
-    }
-    + (if dlqArn != null then {
-      RedrivePolicy: { deadLetterTargetArn: dlqArn, maxReceiveCount: maxReceiveCount },
-    } else {})
-    + (if tags != [] then { Tags: tags } else {}),
+                  VisibilityTimeout: visibilityTimeout,
+                }
+                + (if dlqArn != null then {
+                     RedrivePolicy: { deadLetterTargetArn: dlqArn, maxReceiveCount: maxReceiveCount },
+                   } else {})
+                + (if tags != [] then { Tags: tags } else {}),
   },
 
 
@@ -258,8 +258,10 @@
         Type: 'AWS_PROXY',
         Uri: {
           'Fn::Join': ['', [
-            'arn:', { Ref: 'AWS::Partition' },
-            ':apigateway:', { Ref: 'AWS::Region' },
+            'arn:',
+            { Ref: 'AWS::Partition' },
+            ':apigateway:',
+            { Ref: 'AWS::Region' },
             ':lambda:path/2015-03-31/functions/',
             { 'Fn::GetAtt': [functionLogical, 'Arn'] },
             '/invocations',
@@ -315,10 +317,15 @@
       Principal: 'apigateway.amazonaws.com',
       SourceArn: {
         'Fn::Join': ['', [
-          'arn:', { Ref: 'AWS::Partition' },
-          ':execute-api:', { Ref: 'AWS::Region' }, ':',
-          { Ref: 'AWS::AccountId' }, ':',
-          { Ref: 'ApiGatewayRestApi' }, '/*/*',
+          'arn:',
+          { Ref: 'AWS::Partition' },
+          ':execute-api:',
+          { Ref: 'AWS::Region' },
+          ':',
+          { Ref: 'AWS::AccountId' },
+          ':',
+          { Ref: 'ApiGatewayRestApi' },
+          '/*/*',
         ]],
       },
     },
@@ -368,7 +375,7 @@
   // HTTP API integration + routes + permission (G = group).
   httpApiFnG(logicalName, functionLogical, routes)::
     local integrationLogical = 'HttpApiIntegration' + logicalName;
-    local permissionLogical  = functionLogical + 'PermissionHttpApi';
+    local permissionLogical = functionLogical + 'PermissionHttpApi';
     {
       [integrationLogical]: {
         Type: 'AWS::ApiGatewayV2::Integration',
@@ -382,18 +389,18 @@
       },
     }
     + std.foldl(
-      function(acc, r) acc + {
+      function(acc, r) acc {
         [r.logical]: {
           Type: 'AWS::ApiGatewayV2::Route',
           Properties: {
-            ApiId: { Ref: 'HttpApi' },
-            RouteKey: r.routeKey,
-            Target: { 'Fn::Join': ['/', ['integrations', { Ref: integrationLogical }]] },
-          }
-          + (if std.objectHas(r, 'authorizerId') && r.authorizerId != null then {
-            AuthorizationType: 'JWT',
-            AuthorizerId: r.authorizerId,
-          } else {}),
+                        ApiId: { Ref: 'HttpApi' },
+                        RouteKey: r.routeKey,
+                        Target: { 'Fn::Join': ['/', ['integrations', { Ref: integrationLogical }]] },
+                      }
+                      + (if std.objectHas(r, 'authorizerId') && r.authorizerId != null then {
+                           AuthorizationType: 'JWT',
+                           AuthorizerId: r.authorizerId,
+                         } else {}),
           DependsOn: integrationLogical,
         },
       },
@@ -409,10 +416,15 @@
           Principal: 'apigateway.amazonaws.com',
           SourceArn: {
             'Fn::Join': ['', [
-              'arn:', { Ref: 'AWS::Partition' },
-              ':execute-api:', { Ref: 'AWS::Region' }, ':',
-              { Ref: 'AWS::AccountId' }, ':',
-              { Ref: 'HttpApi' }, '/*',
+              'arn:',
+              { Ref: 'AWS::Partition' },
+              ':execute-api:',
+              { Ref: 'AWS::Region' },
+              ':',
+              { Ref: 'AWS::AccountId' },
+              ':',
+              { Ref: 'HttpApi' },
+              '/*',
             ]],
           },
         },

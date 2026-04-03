@@ -17,14 +17,14 @@
 //               Queue: !GetAtt OrderQueue.Arn
 //               BatchSize: 10
 
-local sam = import '../lib/sam.libsonnet';
-local cfn = import '../lib/cfn.libsonnet';
-local sls = import '../lib/sls.libsonnet';
 local actions = import '../lib/cfn-actions.libsonnet';
+local cfn = import '../lib/cfn.libsonnet';
+local sam = import '../lib/sam.libsonnet';
+local sls = import '../lib/sls.libsonnet';
 
 local service = 'order-processor';
-local stage   = std.extVar('stage');
-local tags    = cfn.tags({ Service: service, Stage: stage });
+local stage = std.extVar('stage');
+local tags = cfn.tags({ Service: service, Stage: stage });
 
 // ── AWS::Serverless::Function ────────────────────────────────────────────────
 local processor = sam.Function('Processor', {
@@ -69,6 +69,6 @@ local processor = sam.Function('Processor', {
     },
   Outputs: {
     QueueUrl: cfn.output(cfn.ref('OrderQueue')),
-    DLQUrl:   cfn.output(cfn.ref('OrderDLQ')),
+    DLQUrl: cfn.output(cfn.ref('OrderDLQ')),
   },
 }

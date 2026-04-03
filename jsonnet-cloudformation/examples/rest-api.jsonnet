@@ -28,19 +28,19 @@
 //         - http: { method: put,    path: /todos/{id}, cors: true, private: true }
 //         - http: { method: delete, path: /todos/{id}, cors: true, private: true }
 
+local actions = import '../lib/cfn-actions.libsonnet';
 local cfn = import '../lib/cfn.libsonnet';
 local sls = import '../lib/sls.libsonnet';
-local actions = import '../lib/cfn-actions.libsonnet';
 
 local service = 'todo-api';
-local stage   = std.extVar('stage');
-local fn      = 'ApiLambdaFunction';
+local stage = std.extVar('stage');
+local fn = 'ApiLambdaFunction';
 local tags = cfn.tags({ Service: service, Stage: stage });
 
 // Logical IDs for API Gateway resources
 local r = {
-  todos:   'ApiGatewayResourceTodos',
-  todoId:  'ApiGatewayResourceTodosIdVar',
+  todos: 'ApiGatewayResourceTodos',
+  todoId: 'ApiGatewayResourceTodosIdVar',
 };
 
 // All method logical IDs (needed for Deployment DependsOn)
@@ -77,17 +77,17 @@ local methods = [
 
     + {
       // Resource tree: /todos and /todos/{id}
-      [r.todos]:  sls.apiResource(cfn.getAtt('ApiGatewayRestApi', 'RootResourceId'), 'todos'),
+      [r.todos]: sls.apiResource(cfn.getAtt('ApiGatewayRestApi', 'RootResourceId'), 'todos'),
       [r.todoId]: sls.apiResource(cfn.ref(r.todos), '{id}'),
 
       // Methods on /todos
-      ApiGatewayMethodTodosGet:  sls.apiMethod(r.todos, 'GET',  fn, apiKeyRequired=true),
+      ApiGatewayMethodTodosGet: sls.apiMethod(r.todos, 'GET', fn, apiKeyRequired=true),
       ApiGatewayMethodTodosPost: sls.apiMethod(r.todos, 'POST', fn, apiKeyRequired=true),
       ApiGatewayMethodTodosOptions: sls.corsOptions(r.todos, ['GET', 'POST']),
 
       // Methods on /todos/{id}
-      ApiGatewayMethodTodosIdVarGet:    sls.apiMethod(r.todoId, 'GET',    fn, apiKeyRequired=true),
-      ApiGatewayMethodTodosIdVarPut:    sls.apiMethod(r.todoId, 'PUT',    fn, apiKeyRequired=true),
+      ApiGatewayMethodTodosIdVarGet: sls.apiMethod(r.todoId, 'GET', fn, apiKeyRequired=true),
+      ApiGatewayMethodTodosIdVarPut: sls.apiMethod(r.todoId, 'PUT', fn, apiKeyRequired=true),
       ApiGatewayMethodTodosIdVarDelete: sls.apiMethod(r.todoId, 'DELETE', fn, apiKeyRequired=true),
       ApiGatewayMethodTodosIdVarOptions: sls.corsOptions(r.todoId, ['GET', 'PUT', 'DELETE']),
 

@@ -92,22 +92,22 @@ local sls = import 'sls.libsonnet';
 
     // Merge globals under props (props wins)
     local functionName = get(props, 'FunctionName', service + '-' + stage + '-' + logicalName);
-    local runtime      = get(props, 'Runtime', g.Runtime);
-    local timeout      = get(props, 'Timeout', g.Timeout);
-    local memory       = get(props, 'MemorySize', g.MemorySize);
-    local handler      = props.Handler;
+    local runtime = get(props, 'Runtime', g.Runtime);
+    local timeout = get(props, 'Timeout', g.Timeout);
+    local memory = get(props, 'MemorySize', g.MemorySize);
+    local handler = props.Handler;
 
-    local gEnv  = get(get(g, 'Environment', {}), 'Variables', {});
-    local fEnv  = get(get(props, 'Environment', {}), 'Variables', {});
-    local env   = gEnv + fEnv;  // function-level wins on conflicts
+    local gEnv = get(get(g, 'Environment', {}), 'Variables', {});
+    local fEnv = get(get(props, 'Environment', {}), 'Variables', {});
+    local env = gEnv + fEnv;  // function-level wins on conflicts
 
     local gTags = get(g, 'Tags', {});
     local fTags = get(props, 'Tags', {});
-    local tags  = cfn.tags(gTags + fTags);
+    local tags = cfn.tags(gTags + fTags);
 
-    local vpcConfig   = get(props, 'VpcConfig', get(g, 'VpcConfig'));
+    local vpcConfig = get(props, 'VpcConfig', get(g, 'VpcConfig'));
     local reservedConc = get(props, 'ReservedConcurrentExecutions');
-    local logDest     = get(props, 'LogDestination', get(g, 'LogDestination'));
+    local logDest = get(props, 'LogDestination', get(g, 'LogDestination'));
 
     // Parse CodeUri (SAM accepts "s3://bucket/key" string or {Bucket, Key} object)
     local code = parseS3Uri(get(props, 'CodeUri', ''));
@@ -122,7 +122,7 @@ local sls = import 'sls.libsonnet';
     );
 
     // Process Events
-    local events     = get(props, 'Events', {});
+    local events = get(props, 'Events', {});
     local eventNames = std.objectFields(events);
 
     // Expand event types that produce standalone resources
@@ -140,13 +140,14 @@ local sls = import 'sls.libsonnet';
             )
           else if e.Type == 'SQS' then
             local arn = get(ep, 'Queue', get(ep, 'Arn'));
-            { [logicalName + eName + 'EventSourceMapping']:
-              sls.sqsEventSource(
-                logicalName + 'LambdaFunction',
-                // If arn is a GetAtt reference, pass through; otherwise wrap
-                if std.isString(arn) then arn else arn,
-                get(ep, 'BatchSize', 10),
-              ),
+            {
+              [logicalName + eName + 'EventSourceMapping']:
+                sls.sqsEventSource(
+                  logicalName + 'LambdaFunction',
+                  // If arn is a GetAtt reference, pass through; otherwise wrap
+                  if std.isString(arn) then arn else arn,
+                  get(ep, 'BatchSize', 10),
+                ),
             }
           // Api and HttpApi events are NOT expanded here — they're collected
           // and passed to the Api/HttpApi expander which handles the full
@@ -171,20 +172,21 @@ local sls = import 'sls.libsonnet';
 
     {
       resources:
-        sls.lambdaFnG(logicalName, {
-          FunctionName: functionName,
-          Handler: handler,
-          Runtime: runtime,
-          MemorySize: memory,
-          Timeout: timeout,
-          Code: { S3Key: code.key }
-                + (if code.bucket != null then { S3Bucket: code.bucket } else {}),
-        }
-        + (if env != {} then { Environment: { Variables: env } } else {})
-        + (if tags != [] then { Tags: tags } else {})
-        + (if vpcConfig != null then { VpcConfig: vpcConfig } else {})
-        + (if reservedConc != null then { ReservedConcurrentExecutions: reservedConc } else {}),
-        logDestination=logDest)
+        sls.lambdaFnG(logicalName,
+                      {
+                        FunctionName: functionName,
+                        Handler: handler,
+                        Runtime: runtime,
+                        MemorySize: memory,
+                        Timeout: timeout,
+                        Code: { S3Key: code.key }
+                              + (if code.bucket != null then { S3Bucket: code.bucket } else {}),
+                      }
+                      + (if env != {} then { Environment: { Variables: env } } else {})
+                      + (if tags != [] then { Tags: tags } else {})
+                      + (if vpcConfig != null then { VpcConfig: vpcConfig } else {})
+                      + (if reservedConc != null then { ReservedConcurrentExecutions: reservedConc } else {}),
+                      logDestination=logDest)
         + eventResources,
 
       extraStatements: extraStatements,
@@ -262,30 +264,37 @@ local sls = import 'sls.libsonnet';
 
     // Resource tree
     local resourceResources = std.foldl(
-      function(acc, seg) acc + { [segLogical(seg)]: sls.apiResource(parentId(seg), lastPart(seg)) },
-      allSegments, {}
+      function(acc, seg) acc { [segLogical(seg)]: sls.apiResource(parentId(seg), lastPart(seg)) },
+      allSegments,
+      {}
     );
 
     // Methods
     local methodLogical(path, method) = 'ApiGatewayMethod' + pathToLogical(path) + titleCase(method);
     local methodResources = std.foldl(
-      function(acc, r) acc + { [methodLogical(r.path, r.method)]:
-        sls.apiMethod(
-          segLogical(r.path),
-          r.method, r.functionLogical, apiKeyRequired=r.apiKeyRequired,
-        ),
+      function(acc, r) acc {
+        [methodLogical(r.path, r.method)]:
+          sls.apiMethod(
+            segLogical(r.path),
+            r.method,
+            r.functionLogical,
+            apiKeyRequired=r.apiKeyRequired,
+          ),
       },
-      allRoutes, {}
+      allRoutes,
+      {}
     );
 
     // CORS OPTIONS (one per unique path, listing all verbs on that path)
     local corsLogical(path) = 'ApiGatewayMethod' + pathToLogical(path) + 'Options';
     local methodsForPath(path) = [r.method for r in allRoutes if r.path == path];
     local corsResources = std.foldl(
-      function(acc, path) acc + { [corsLogical(path)]:
-        sls.corsOptions(segLogical(path), methodsForPath(path)),
+      function(acc, path) acc {
+        [corsLogical(path)]:
+          sls.corsOptions(segLogical(path), methodsForPath(path)),
       },
-      allPaths, {}
+      allPaths,
+      {}
     );
 
     // All method IDs for Deployment DependsOn
@@ -296,8 +305,9 @@ local sls = import 'sls.libsonnet';
     // Lambda permissions (one per unique function)
     local uniqueFns = std.set([r.functionLogical for r in allRoutes]);
     local permResources = std.foldl(
-      function(acc, fl) acc + { [fl + 'PermissionApiGateway']: sls.apiLambdaPermission(fl) },
-      uniqueFns, {}
+      function(acc, fl) acc { [fl + 'PermissionApiGateway']: sls.apiLambdaPermission(fl) },
+      uniqueFns,
+      {}
     );
 
     // Usage plan / API key
@@ -312,33 +322,33 @@ local sls = import 'sls.libsonnet';
         + { ApiGatewayDeployment: sls.apiDeployment(stage, dependsOn=allMethodIds) }
         + permResources
         + (if hasUsagePlan then {
-          ApiGatewayApiKey1: {
-            Type: 'AWS::ApiGateway::ApiKey',
-            Properties: {
-              Enabled: true,
-              Name: service + '-' + stage + '-apikey',
-              StageKeys: [{ RestApiId: { Ref: 'ApiGatewayRestApi' }, StageName: stage }],
-            },
-            DependsOn: 'ApiGatewayDeployment',
-          },
-          ApiGatewayUsagePlan: {
-            Type: 'AWS::ApiGateway::UsagePlan',
-            DependsOn: 'ApiGatewayDeployment',
-            Properties: {
-              ApiStages: [{ ApiId: { Ref: 'ApiGatewayRestApi' }, Stage: stage }],
-              Description: 'Usage plan for ' + service + ' ' + stage + ' stage',
-              UsagePlanName: service + '-' + stage,
-            },
-          },
-          ApiGatewayUsagePlanKey1: {
-            Type: 'AWS::ApiGateway::UsagePlanKey',
-            Properties: {
-              KeyId: { Ref: 'ApiGatewayApiKey1' },
-              KeyType: 'API_KEY',
-              UsagePlanId: { Ref: 'ApiGatewayUsagePlan' },
-            },
-          },
-        } else {}),
+             ApiGatewayApiKey1: {
+               Type: 'AWS::ApiGateway::ApiKey',
+               Properties: {
+                 Enabled: true,
+                 Name: service + '-' + stage + '-apikey',
+                 StageKeys: [{ RestApiId: { Ref: 'ApiGatewayRestApi' }, StageName: stage }],
+               },
+               DependsOn: 'ApiGatewayDeployment',
+             },
+             ApiGatewayUsagePlan: {
+               Type: 'AWS::ApiGateway::UsagePlan',
+               DependsOn: 'ApiGatewayDeployment',
+               Properties: {
+                 ApiStages: [{ ApiId: { Ref: 'ApiGatewayRestApi' }, Stage: stage }],
+                 Description: 'Usage plan for ' + service + ' ' + stage + ' stage',
+                 UsagePlanName: service + '-' + stage,
+               },
+             },
+             ApiGatewayUsagePlanKey1: {
+               Type: 'AWS::ApiGateway::UsagePlanKey',
+               Properties: {
+                 KeyId: { Ref: 'ApiGatewayApiKey1' },
+                 KeyType: 'API_KEY',
+                 UsagePlanId: { Ref: 'ApiGatewayUsagePlan' },
+               },
+             },
+           } else {}),
     },
 
 
@@ -359,14 +369,16 @@ local sls = import 'sls.libsonnet';
     local authResources = std.foldl(
       function(acc, aName)
         local a = authCfg[aName];
-        acc + { ['HttpApiAuthorizer' + titleCase(aName)]:
-          sls.httpApiJwtAuthorizer(
-            aName,
-            a.Issuer,
-            a.Audience,
-          ),
+        acc {
+          ['HttpApiAuthorizer' + titleCase(aName)]:
+            sls.httpApiJwtAuthorizer(
+              aName,
+              a.Issuer,
+              a.Audience,
+            ),
         },
-      std.objectFields(authCfg), {}
+      std.objectFields(authCfg),
+      {}
     );
 
     // Per-function: Integration + Routes + Permission
@@ -386,7 +398,8 @@ local sls = import 'sls.libsonnet';
         ];
         local fnName = std.strReplace(fn.functionLogical, 'LambdaFunction', '');
         acc + sls.httpApiFnG(fnName, fn.functionLogical, routes),
-      functions, {}
+      functions,
+      {}
     );
 
     {

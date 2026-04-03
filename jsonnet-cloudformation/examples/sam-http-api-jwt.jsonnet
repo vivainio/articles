@@ -23,13 +23,13 @@
 //                 issuer: https://example.auth0.com/
 //                 audience: [https://api.example.com]
 
-local sam = import '../lib/sam.libsonnet';
-local cfn = import '../lib/cfn.libsonnet';
-local sls = import '../lib/sls.libsonnet';
 local actions = import '../lib/cfn-actions.libsonnet';
+local cfn = import '../lib/cfn.libsonnet';
+local sam = import '../lib/sam.libsonnet';
+local sls = import '../lib/sls.libsonnet';
 
 local service = 'user-api';
-local stage   = std.extVar('stage');
+local stage = std.extVar('stage');
 
 // ── AWS::Serverless::Function ────────────────────────────────────────────────
 local apiHandler = sam.Function('Api', {
@@ -40,11 +40,11 @@ local apiHandler = sam.Function('Api', {
     cfn.allow(actions.ddbAll, cfn.arn('dynamodb', 'table/users-' + stage)),
   ]),
   Events: {
-    GetUser:    { Type: 'HttpApi', Properties: { Path: '/users/{id}', Method: 'GET',    Auth: { Authorizer: 'auth0' } } },
-    PutUser:    { Type: 'HttpApi', Properties: { Path: '/users/{id}', Method: 'PUT',    Auth: { Authorizer: 'auth0' } } },
+    GetUser: { Type: 'HttpApi', Properties: { Path: '/users/{id}', Method: 'GET', Auth: { Authorizer: 'auth0' } } },
+    PutUser: { Type: 'HttpApi', Properties: { Path: '/users/{id}', Method: 'PUT', Auth: { Authorizer: 'auth0' } } },
     DeleteUser: { Type: 'HttpApi', Properties: { Path: '/users/{id}', Method: 'DELETE', Auth: { Authorizer: 'auth0' } } },
-    ListUsers:  { Type: 'HttpApi', Properties: { Path: '/users',      Method: 'GET',    Auth: { Authorizer: 'auth0' } } },
-    CreateUser: { Type: 'HttpApi', Properties: { Path: '/users',      Method: 'POST',   Auth: { Authorizer: 'auth0' } } },
+    ListUsers: { Type: 'HttpApi', Properties: { Path: '/users', Method: 'GET', Auth: { Authorizer: 'auth0' } } },
+    CreateUser: { Type: 'HttpApi', Properties: { Path: '/users', Method: 'POST', Auth: { Authorizer: 'auth0' } } },
   },
 }, service=service, stage=stage);
 
