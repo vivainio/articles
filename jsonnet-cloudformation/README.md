@@ -42,7 +42,10 @@ permissions. For teams whose Lambda functions are Python or Go, maintaining a
 Node toolchain (plus the Python/C# toolchain you actually chose) solely for
 the deployment layer is overhead that never pays for itself. CDK also
 generates CloudFormation with machine-generated logical IDs (hashes), making
-diffs and troubleshooting harder than hand-written templates.
+diffs and troubleshooting harder than hand-written templates. CDK shines when
+you have large, complex infrastructure with dozens of interdependent resources
+— but for typical serverless stacks (a few Lambdas, an API Gateway, some
+queues), it's overkill.
 
 **Terraform** is a legitimate option but means adopting an entirely new state
 management model, HCL syntax, and provider versioning. If your infrastructure
