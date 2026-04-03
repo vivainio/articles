@@ -170,6 +170,76 @@ local cfn = import 'cfn.libsonnet';
   },
 
 
+  // ── HTTP API (API Gateway v2) ──────────────────────────────────────────
+
+  // Expands to: {prefix} (Api) + {prefix}Stage.
+  //   aws.httpApiG('MyApi', 'my-service-dev')
+  httpApiG(prefix, name):: {
+    [prefix]: {
+      Type: 'AWS::ApiGatewayV2::Api',
+      Properties: { Name: name, ProtocolType: 'HTTP' },
+    },
+    [prefix + 'Stage']: {
+      Type: 'AWS::ApiGatewayV2::Stage',
+      Properties: {
+        ApiId: cfn.ref(prefix),
+        StageName: '$default',
+        AutoDeploy: true,
+      },
+    },
+  },
+
+  // Returns a single JWT authorizer value.
+  //   MyApiAuth: aws.jwtAuthorizer('MyApi', 'jwt', issuer, audience)
+  jwtAuthorizer(apiLogical, name, issuer, audience):: {
+    Type: 'AWS::ApiGatewayV2::Authorizer',
+    Properties: {
+      ApiId: cfn.ref(apiLogical),
+      Name: name,
+      AuthorizerType: 'JWT',
+      IdentitySource: ['$request.header.Authorization'],
+      JwtConfiguration: { Issuer: issuer, Audience: audience },
+    },
+  },
+
+  // Expands to: {prefix}Integration + {prefix}Route + {prefix}Permission.
+  // Routes a path to a Lambda function through the given HTTP API.
+  //   aws.httpApiRouteG('Foo', 'MyApi', 'FooFunction', 'GET /foo')
+  //   aws.httpApiRouteG('Bar', 'MyApi', 'BarFunction', '$default', authorizerId=cfn.ref('MyApiAuth'))
+  httpApiRouteG(prefix, apiLogical, functionLogical, routeKey, authorizerId=null):: {
+    [prefix + 'Integration']: {
+      Type: 'AWS::ApiGatewayV2::Integration',
+      Properties: {
+        ApiId: cfn.ref(apiLogical),
+        IntegrationType: 'AWS_PROXY',
+        IntegrationUri: cfn.getArn(functionLogical),
+        PayloadFormatVersion: '2.0',
+      },
+    },
+    [prefix + 'Route']: {
+      Type: 'AWS::ApiGatewayV2::Route',
+      Properties: {
+        ApiId: cfn.ref(apiLogical),
+        RouteKey: routeKey,
+        Target: cfn.sub('integrations/${' + prefix + 'Integration}'),
+      }
+      + (if authorizerId != null then {
+        AuthorizationType: 'JWT',
+        AuthorizerId: authorizerId,
+      } else {}),
+    },
+    [prefix + 'Permission']: {
+      Type: 'AWS::Lambda::Permission',
+      Properties: {
+        FunctionName: cfn.getArn(functionLogical),
+        Action: 'lambda:InvokeFunction',
+        Principal: 'apigateway.amazonaws.com',
+        SourceArn: cfn.sub('arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${' + apiLogical + '}/*'),
+      },
+    },
+  },
+
+
   // ── Schedule event (G) ───────────────────────────────────────────────────
   // Expands to: {prefix}Rule + {prefix}Permission.
   scheduleG(prefix, functionLogical, schedule, enabled=true):: {

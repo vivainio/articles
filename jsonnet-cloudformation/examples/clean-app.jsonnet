@@ -1,4 +1,4 @@
-// Clean-room example: Lambda + DynamoDB + S3 bucket
+// Clean-room example: Lambda + DynamoDB + S3 + HTTP API with JWT
 //
 // Uses aws.libsonnet — no Serverless Framework conventions, no fixed
 // logical IDs, no deployment bucket. Every resource name is explicit.
@@ -20,6 +20,8 @@ local logDest = cfn.ref('LogDestinationArn');
   Parameters: {
     PartnerAccountId: cfn.param(description='AWS account ID allowed to invoke the function'),
     LogDestinationArn: cfn.param(description='Kinesis/Firehose destination ARN for log forwarding'),
+    JwtIssuer: cfn.param(description='JWT issuer URL (e.g. https://example.auth0.com/)'),
+    JwtAudience: cfn.param(description='JWT audience'),
   },
 
   Resources:
@@ -30,6 +32,13 @@ local logDest = cfn.ref('LogDestinationArn');
       Role: cfn.getArn('AppRole'),
       Environment: { Variables: { TABLE: table, BUCKET: bucket } },
     })
+
+    // HTTP API with JWT-protected proxy route
+    + aws.httpApiG('MyApi', service + '-' + stage)
+    + { MyApiAuth: aws.jwtAuthorizer('MyApi', 'jwt', cfn.ref('JwtIssuer'), [cfn.ref('JwtAudience')]) }
+    + aws.httpApiRouteG('AppDefault', 'MyApi', 'AppFunction', '$default', authorizerId=cfn.ref('MyApiAuth'))
+    + aws.httpApiRouteG('AppLogin', 'MyApi', 'AppFunction', 'POST /login')
+
     + {
       AppRole: aws.lambdaRole(service + '-' + stage, [
         cfn.allow(actions.ddbAll, cfn.arn('dynamodb', 'table/' + table)),
@@ -53,6 +62,7 @@ local logDest = cfn.ref('LogDestinationArn');
     },
 
   Outputs: {
+    ApiEndpoint: cfn.output(cfn.sub('https://${MyApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}')),
     FunctionArn: cfn.output(cfn.getArn('AppFunction')),
     TableName: cfn.output(cfn.ref('DataTable')),
     BucketName: cfn.output(cfn.ref('DataBucket')),
