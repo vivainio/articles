@@ -248,6 +248,33 @@ jsonnet --ext-str stage=prod examples/scheduled-worker.jsonnet > prod.json
 
 One source file generates all stages. No near-identical copies.
 
+## Deploying code separately
+
+The Serverless Framework bundled code deployment with infrastructure: it zipped
+your handler, uploaded it to S3, and pointed `Code.S3Key` at the new artifact
+in the CloudFormation template. Every deploy was a full stack update, even if
+only the function code changed.
+
+Once you manage the template yourself, you can separate the two concerns:
+
+1. **Infrastructure changes** (new resources, IAM policy updates, environment
+   variable changes) go through `aws cloudformation deploy` as before.
+2. **Code-only changes** use `aws lambda update-function-code --function-name
+   my-service-dev-worker --zip-file fileb://package.zip` — no CloudFormation
+   involved, completes in seconds.
+
+This is faster and simpler for day-to-day development. You don't need to
+maintain S3 keys in your template or manage artifact versioning in a deployment
+bucket. The template's `Code` property becomes a one-time bootstrap value (or
+points to a fixed S3 path that your CI overwrites).
+
+The trade-off: CloudFormation rollbacks won't roll back code changes made
+outside the stack. In practice this rarely matters — if a code deploy breaks
+something, you redeploy the previous version with `update-function-code`. But
+if you need atomic infrastructure + code rollbacks (e.g. a new DynamoDB table
+and the code that uses it must deploy or fail together), keep the S3-based
+approach for those stacks.
+
 ## Comparison
 
 For a REST API with 5 routes:
