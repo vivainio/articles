@@ -56,39 +56,68 @@ local cfn = import 'cfn.libsonnet';
     },
 
 
-  // ── Lambda execution role ────────────────────────────────────────────────
-  // Returns a single IAM::Role value with Lambda trust policy and
-  // CloudWatch Logs permissions scoped to the given function name prefix.
-  // Pass additional statements for service-specific access.
-  lambdaRole(logPrefix, statements=[], managedPolicies=[]):: {
+  // ── Service role ──────────────────────────────────────────────────────────
+  // Returns a single IAM::Role trusted by an AWS service.
+  //   AppRole: aws.serviceRole('ecs-tasks.amazonaws.com', [...])
+  serviceRole(service, statements=[], managedPolicies=[]):: {
     Type: 'AWS::IAM::Role',
     Properties: {
       AssumeRolePolicyDocument: {
         Version: '2012-10-17',
         Statement: [{
           Effect: 'Allow',
-          Principal: { Service: 'lambda.amazonaws.com' },
+          Principal: { Service: service },
           Action: 'sts:AssumeRole',
         }],
       },
+    }
+    + (if statements != [] then {
       Policies: [{
         PolicyName: 'policy',
-        PolicyDocument: {
-          Version: '2012-10-17',
-          Statement: [
-            cfn.allow(
-              ['logs:CreateLogStream', 'logs:CreateLogGroup', 'logs:TagResource'],
-              cfn.arn('logs', 'log-group:/aws/lambda/' + logPrefix + '*:*'),
-            ),
-            cfn.allow(
-              ['logs:PutLogEvents'],
-              cfn.arn('logs', 'log-group:/aws/lambda/' + logPrefix + '*:*:*'),
-            ),
-          ] + statements,
-        },
+        PolicyDocument: { Version: '2012-10-17', Statement: statements },
       }],
-    } + (if managedPolicies != [] then { ManagedPolicyArns: managedPolicies } else {}),
+    } else {})
+    + (if managedPolicies != [] then { ManagedPolicyArns: managedPolicies } else {}),
   },
+
+  // ── Assumable role ─────────────────────────────────────────────────────────
+  // Returns a single IAM::Role trusted by AWS principals (account IDs, role ARNs).
+  //   ReadOnly: aws.assumableRole([accountId], [...], condition={...})
+  assumableRole(principals, statements=[], condition=null, managedPolicies=[]):: {
+    Type: 'AWS::IAM::Role',
+    Properties: {
+      AssumeRolePolicyDocument: {
+        Version: '2012-10-17',
+        Statement: [{
+          Effect: 'Allow',
+          Principal: { AWS: principals },
+          Action: 'sts:AssumeRole',
+        } + (if condition != null then { Condition: condition } else {})],
+      },
+    }
+    + (if statements != [] then {
+      Policies: [{
+        PolicyName: 'policy',
+        PolicyDocument: { Version: '2012-10-17', Statement: statements },
+      }],
+    } else {})
+    + (if managedPolicies != [] then { ManagedPolicyArns: managedPolicies } else {}),
+  },
+
+  // ── Lambda execution role ────────────────────────────────────────────────
+  // serviceRole specialized for Lambda — adds CloudWatch Logs permissions
+  // scoped to the given function name prefix.
+  lambdaRole(logPrefix, statements=[], managedPolicies=[])::
+    $.serviceRole('lambda.amazonaws.com', [
+      cfn.allow(
+        ['logs:CreateLogStream', 'logs:CreateLogGroup', 'logs:TagResource'],
+        cfn.arn('logs', 'log-group:/aws/lambda/' + logPrefix + '*:*'),
+      ),
+      cfn.allow(
+        ['logs:PutLogEvents'],
+        cfn.arn('logs', 'log-group:/aws/lambda/' + logPrefix + '*:*:*'),
+      ),
+    ] + statements, managedPolicies),
 
 
   // ── DynamoDB table (on-demand) ─────────────────────────────────────────
