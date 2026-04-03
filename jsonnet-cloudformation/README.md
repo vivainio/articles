@@ -159,7 +159,7 @@ The steps:
 4. **Verify** by diffing the Jsonnet output against the captured original:
    `diff <(jsonnet my-service.jsonnet) captured-original.json`. The resource
    structure should match — key names, types, properties. Minor differences
-   in JSON key ordering are expected (Jsonnet sorts alphabetically).
+   in JSON key ordering are expected (Jsonnet [sorts alphabetically](#caveats)).
 
 5. **Deploy** the Jsonnet-generated template to the *existing* stack.
    CloudFormation computes a changeset against the current state. If the
