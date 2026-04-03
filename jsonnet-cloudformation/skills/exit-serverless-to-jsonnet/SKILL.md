@@ -61,6 +61,61 @@ Read the template and classify every resource by pattern. Use this table:
 | `AWS::SQS::QueuePolicy` | Queue policy | Pass-through as raw Jsonnet object |
 | Anything with `Custom::` type | SLS custom resource | Copy verbatim as raw Jsonnet block |
 
+### Step 1b: Recognize interpolation hacks
+
+If you have access to the `serverless.yml` (not just the generated JSON),
+look for the interpolation patterns below. Each one represents a value that
+was resolved at a different time in the SLS pipeline. Understanding when each
+resolves tells you how to replace it in Jsonnet.
+
+**`${self:...}` / `${opt:...}` — resolved at package time.** SLS bakes
+these into the generated JSON as string literals. `${self:provider.stage}`
+becomes `"dev"`, `${opt:region}` becomes `"eu-west-1"`. In Jsonnet, replace
+with `std.extVar('stage')` or a local variable. If the `serverless.yml` uses
+`custom.defaultStage` / `custom.defaultRegion` placeholder values (like
+`default-stage`), these placeholders will appear as literals in the generated
+JSON — see the `sed` pattern below.
+
+**`#{AWS::AccountId}` / `#{AWS::Region}` — the `serverless-cf-vars` plugin.**
+This plugin rewrites `#{...}` to `${...}` in the output JSON so that
+CloudFormation's `Fn::Sub` resolves them at deploy time. Without the plugin,
+SLS would try to resolve `${AWS::AccountId}` as its own variable and fail.
+In the generated JSON these appear inside `Fn::Sub` expressions. In Jsonnet,
+use `cfn.sub(...)` or `cfn.arn(...)`.
+
+**`${file(path):field}` — file-based lookups, resolved at package time.**
+Common variants:
+- `${file(build_info.yml):Branch}` — CI build metadata injected into tags.
+  In Jsonnet, replace with `std.extVar('branch')` passed at render time.
+- `${file(references.yml):${self:provider.stage}.subnetIds}` — stage-keyed
+  config in a separate YAML file. In Jsonnet, replace with `std.extVar` or
+  an imported Jsonnet config object.
+
+**`default-*` placeholder + `sed` — the most fragile pattern.** When one
+`sls package` output is deployed to multiple stages/regions, the
+`serverless.yml` uses made-up defaults (`default-stage`, `default-kmskey`,
+`default-cmosEventsTopic`, etc.) that appear as literals in the generated
+JSON. The deploy script then runs `sed -i "s/default-stage/${REAL_VALUE}/g"`
+on the JSON before `sls deploy --package`. This is global string replacement
+on machine-generated JSON — if the placeholder appears in an unexpected
+context, or a real value contains the placeholder string, things break
+silently. Larger services can have 8+ `sed` replacements. In Jsonnet, all of
+these become `std.extVar(...)` — resolved at render time with no string
+replacement. This is often the single biggest reliability win of the
+migration.
+
+**`{{resolve:ssm:/path}}` — CloudFormation dynamic references.** These pass
+through SLS untouched and are resolved by CloudFormation at deploy time.
+Common for Splunk destinations, VPC IDs, subnet IDs, KMS keys. In Jsonnet,
+keep these as literal strings — they work in raw CloudFormation JSON
+unchanged.
+
+When converting, check the `deploy.sh` / `deployspec.yml` alongside the
+`serverless.yml`. The `sed` replacements in the deploy script reveal which
+values are parameterized at deploy time — these are your `std.extVar`
+candidates. Values that only appear in `${self:...}` expressions are
+package-time constants that become locals or ext-vars in Jsonnet.
+
 ### Step 2: Extract parameters
 
 From the template, identify:
