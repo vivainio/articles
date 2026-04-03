@@ -491,6 +491,7 @@ helper returns a plain object. If a helper doesn't do what you need, you merge
 in a raw CloudFormation block with `+` right next to it — no escape hatch, no
 special API, just data. High-level helpers and low-level resources coexist in
 the same file, in the same `Resources:` object, with the same merge operator.
+
 CDK also makes reorganization painful: moving a resource from one construct to
 another changes its logical ID (because the construct path is part of the
 hash), which CloudFormation treats as a delete-and-recreate. CDK has a
