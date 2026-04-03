@@ -18,12 +18,18 @@ evaluating alternatives at this point.
 ### The usual alternatives
 
 **AWS SAM** is the natural first stop. It's AWS-native, open source, and
-`AWS::Serverless::Function` is a clean abstraction. The problem is the SAM
-transform: your template is rewritten by CloudFormation at deploy time. When
-something goes wrong, you're debugging resources you didn't declare. You can
-run `sam build` to preview the expansion, but the authoritative template — the
-one CloudFormation actually acts on — is generated server-side. You traded one
-black box for another.
+`AWS::Serverless::Function` is a clean abstraction. But SAM only provides a
+handful of built-in resource types (`Function`, `Api`, `HttpApi`,
+`SimpleTable`, and a few others). The moment you need something outside that
+set — a custom IAM policy, an SQS queue with a DLQ, a CloudWatch alarm — you
+drop back to plain CloudFormation YAML with no templating, no functions, and no
+way to reduce repetition. SAM gives you abstractions for the easy parts but
+leaves you on your own for everything else. On top of that, the SAM transform
+is a black box: your template is rewritten by CloudFormation at deploy time.
+When something goes wrong, you're debugging resources you didn't declare. You
+can run `sam build` to preview the expansion, but the authoritative template —
+the one CloudFormation actually acts on — is generated server-side. You traded
+one black box for another.
 
 **AWS CDK** is popular but carries real costs. It requires a Node.js runtime
 and `npm install` for every project, pulling in hundreds of transitive
