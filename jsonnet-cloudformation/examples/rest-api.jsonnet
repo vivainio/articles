@@ -33,6 +33,7 @@ local cfn = import '../lib/cfn.libsonnet';
 local service = 'todo-api';
 local stage   = std.extVar('stage');
 local fn      = 'ApiLambdaFunction';
+local tags = cfn.tags({ Service: service, Stage: stage });
 
 // Logical IDs for API Gateway resources
 local r = {
@@ -67,6 +68,7 @@ local methods = [
       handler='wsgi_handler.handler',
       s3Key='serverless/' + service + '/' + stage + '/package.zip',
       env={ STAGE: stage },
+      tags=tags,
     )
 
     // REST API

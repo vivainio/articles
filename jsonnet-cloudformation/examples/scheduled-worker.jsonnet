@@ -28,6 +28,7 @@ local cfn = import '../lib/cfn.libsonnet';
 
 local service = 'snapshot-cleanup';
 local stage   = std.extVar('stage');
+local tags = cfn.tags({ Service: service, Stage: stage });
 
 {
   AWSTemplateFormatVersion: '2010-09-09',
@@ -45,6 +46,7 @@ local stage   = std.extVar('stage');
       runtime='python3.12',
       memory=512,
       timeout=600,
+      tags=tags,
     )
     + cfn.scheduleEvent('Worker', 'cron(0 3 * * ? *)', enabled=true),
 

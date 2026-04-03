@@ -30,6 +30,7 @@ local cfn = import '../lib/cfn.libsonnet';
 
 local service = 'user-api';
 local stage   = std.extVar('stage');
+local tags = cfn.tags({ Service: service, Stage: stage });
 
 local authorizerLogical = 'HttpApiAuthorizerAuth0';
 local authRef = cfn.ref(authorizerLogical);
@@ -50,6 +51,7 @@ local authRef = cfn.ref(authorizerLogical);
       handler='app.handler',
       s3Key='serverless/' + service + '/' + stage + '/package.zip',
       env={ STAGE: stage, TABLE_NAME: 'users-' + stage },
+      tags=tags,
     )
 
     // HTTP API + auto-deploy stage
