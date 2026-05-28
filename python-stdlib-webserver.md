@@ -33,17 +33,19 @@ What we want to write:
 
 ```python
 @route("GET", "/hello")
-def hello(req):
+def hello(req: Request) -> dict:
     return {"message": "hello world"}
 
 @route("GET", "/users/{id}")
-def get_user(req, id):
+def get_user(req: Request, id: str) -> dict:
     return {"id": id, "name": f"user-{id}"}
 
 @route("POST", "/echo")
-def echo(req):
+def echo(req: Request) -> Any:
     return req.json
 ```
+
+Note that path parameters always arrive as strings — the regex captures text, so if you want an `int` you cast it inside the handler.
 
 That's the target. Now let's build it.
 
@@ -53,12 +55,14 @@ A route is a `(method, pattern, function)` tuple. Patterns like `/users/{id}` ne
 
 ```python
 import re
+from typing import Any, Callable
 
-ROUTES = []
+Handler = Callable[..., Any]
+ROUTES: list[tuple[str, re.Pattern[str], Handler]] = []
 
-def route(method, pattern):
+def route(method: str, pattern: str) -> Callable[[Handler], Handler]:
     regex = re.compile("^" + re.sub(r"\{(\w+)\}", r"(?P<\1>[^/]+)", pattern) + "$")
-    def decorator(func):
+    def decorator(func: Handler) -> Handler:
         ROUTES.append((method, regex, func))
         return func
     return decorator
@@ -72,20 +76,22 @@ The handler functions receive a `req` object. We don't need much — the method,
 
 ```python
 import json
+from http.server import BaseHTTPRequestHandler
+from typing import Any
 from urllib.parse import urlparse, parse_qs
 
 class Request:
-    def __init__(self, handler):
+    def __init__(self, handler: BaseHTTPRequestHandler) -> None:
         parsed = urlparse(handler.path)
-        self.method = handler.command
-        self.path = parsed.path
-        self.query = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+        self.method: str = handler.command
+        self.path: str = parsed.path
+        self.query: dict[str, str] = {k: v[0] for k, v in parse_qs(parsed.query).items()}
         self.headers = handler.headers
         length = int(handler.headers.get("Content-Length", 0))
-        self.body = handler.rfile.read(length) if length else b""
+        self.body: bytes = handler.rfile.read(length) if length else b""
 
     @property
-    def json(self):
+    def json(self) -> Any:
         return json.loads(self.body) if self.body else None
 ```
 
@@ -99,7 +105,7 @@ Now wire it all together. A single `BaseHTTPRequestHandler` subclass dispatches 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 class App(BaseHTTPRequestHandler):
-    def _dispatch(self):
+    def _dispatch(self) -> None:
         req = Request(self)
         for method, regex, func in ROUTES:
             if method != req.method:
@@ -114,7 +120,7 @@ class App(BaseHTTPRequestHandler):
             return self._send(200, result)
         self._send(404, {"error": "not found"})
 
-    def _send(self, status, body):
+    def _send(self, status: int, body: Any) -> None:
         payload = json.dumps(body).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -124,7 +130,7 @@ class App(BaseHTTPRequestHandler):
 
     do_GET = do_POST = do_PUT = do_DELETE = do_PATCH = _dispatch
 
-    def log_message(self, fmt, *args):
+    def log_message(self, fmt: str, *args: Any) -> None:
         print(f"{self.command} {self.path} -> {args[1]}")
 ```
 
@@ -148,7 +154,7 @@ That's the whole framework — about 50 lines including blanks. Drop your routes
 The `_send` helper assumes everything is JSON. For the simulator use case that's usually right, but sometimes you want to return a status code, or HTML, or an empty body. A common pattern is to let the handler return a tuple or a sentinel:
 
 ```python
-def _send_result(self, result):
+def _send_result(self, result: Any) -> None:
     if isinstance(result, tuple):
         status, body = result
     else:
