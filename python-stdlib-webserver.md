@@ -169,15 +169,4 @@ ThreadingHTTPServer(("127.0.0.1", 8000), App).serve_forever()
 
 Same API, one thread per request. Don't share mutable state across handlers without a lock.
 
-## When To Reach for the Real Thing
-
-This pattern is great for:
-
-- **API simulators / fakes** when you're developing against an upstream that isn't ready
-- **Webhook receivers** for local testing — point Stripe or GitHub at your ngrok tunnel
-- **Quick file/data servers** for demos and screencasts
-- **Smoke tests** in CI where you need a controllable HTTP endpoint
-
-It's not great for anything that needs middleware, authentication, async I/O, content negotiation, or more than a handful of routes. The moment you're tempted to add a second decorator, install FastAPI.
-
-But for the 80% case where you just need to answer a few HTTP requests with canned data, the standard library has had you covered since Python 2. It just needed a tiny bit of sugar on top.
+For the case where you just need to answer a few HTTP requests with canned data, the standard library has had you covered since Python 2. It just needed a tiny bit of sugar on top.
