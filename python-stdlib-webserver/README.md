@@ -6,7 +6,7 @@ Sometimes you don't need Flask, FastAPI, or Starlette. You need a 50-line script
 
 Python's `http.server` module already ships with everything you need. The default `BaseHTTPRequestHandler` API is just clunky enough that people reach for Flask instead. With about thirty lines of glue you can turn it into something that looks like a real micro-framework: route decorators, path parameters, JSON in and out.
 
-This article walks through that glue. The complete, runnable file is in [`server.py`](server.py) next to this article — copy it and start adding routes.
+This article walks through that glue. The complete library lives in [`tinyserver.py`](tinyserver.py) next to this article, and [`app.py`](app.py) shows how to use it.
 
 ## The Bare Minimum
 
@@ -138,16 +138,28 @@ The `do_GET = do_POST = ...` line is the trick that keeps this short. `BaseHTTPR
 
 ## Putting It Together
 
-```python
-def main():
-    print("listening on http://127.0.0.1:8000")
-    HTTPServer(("127.0.0.1", 8000), App).serve_forever()
+Wrap the server loop in a `serve()` helper so callers don't have to import `ThreadingHTTPServer` themselves:
 
-if __name__ == "__main__":
-    main()
+```python
+def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
+    print(f"listening on http://{host}:{port}")
+    ThreadingHTTPServer((host, port), App).serve_forever()
 ```
 
-That's the whole framework — about 50 lines including blanks. Drop your routes above `main()` and you're done.
+That's the whole library — about 60 lines including blanks. Save it as `tinyserver.py` and your own app file just needs to import from it:
+
+```python
+from tinyserver import Request, route, serve
+
+@route("GET", "/ping")
+def ping(req: Request) -> dict:
+    return {"ok": True}
+
+if __name__ == "__main__":
+    serve()
+```
+
+Routes register themselves via the `@route` decorator into the shared `ROUTES` list at import time, so the app file never touches it directly.
 
 ## Returning Non-JSON
 
@@ -166,13 +178,6 @@ Now handlers can write `return 404, {"error": "no such user"}` when they want a 
 
 ## Threading
 
-`HTTPServer` is single-threaded — one request at a time. For a simulator that usually doesn't matter, but if your client makes parallel requests and your handlers do anything slow, swap in `ThreadingHTTPServer`:
-
-```python
-from http.server import ThreadingHTTPServer
-ThreadingHTTPServer(("127.0.0.1", 8000), App).serve_forever()
-```
-
-Same API, one thread per request. Don't share mutable state across handlers without a lock.
+The `serve()` helper above uses `ThreadingHTTPServer` so parallel client requests don't block each other — one thread per request. If you'd rather have strict single-threaded behaviour (easier debugging, no concurrency surprises), swap it for `HTTPServer`. Either way, don't share mutable state across handlers without a lock.
 
 For the case where you just need to answer a few HTTP requests with canned data, the standard library has had you covered since Python 2. It just needed a tiny bit of sugar on top.

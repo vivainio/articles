@@ -1,13 +1,21 @@
-"""Tiny HTTP server built on http.server with route decorators.
+"""Tiny HTTP server library built on http.server with route decorators.
 
-Drop in your routes and run: python server.py
+Usage:
+
+    from tinyserver import route, Request, serve
+
+    @route("GET", "/hello")
+    def hello(req: Request) -> dict:
+        return {"message": "hello"}
+
+    serve()
 """
 
 from __future__ import annotations
 
 import json
 import re
-from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
 
@@ -75,34 +83,6 @@ class App(BaseHTTPRequestHandler):
         print(f"{self.command} {self.path} -> {args[1]}")
 
 
-# --- Your routes go here ---------------------------------------------------
-
-
-@route("GET", "/hello")
-def hello(req: Request) -> dict:
-    return {"message": "hello world"}
-
-
-@route("GET", "/users/{id}")
-def get_user(req: Request, id: str) -> Any:
-    if id == "0":
-        return 404, {"error": "no such user"}
-    return {"id": id, "name": f"user-{id}"}
-
-
-@route("POST", "/echo")
-def echo(req: Request) -> Any:
-    return req.json
-
-
-# --- Entry point -----------------------------------------------------------
-
-
-def main() -> None:
-    addr = ("127.0.0.1", 8000)
-    print(f"listening on http://{addr[0]}:{addr[1]}")
-    ThreadingHTTPServer(addr, App).serve_forever()
-
-
-if __name__ == "__main__":
-    main()
+def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
+    print(f"listening on http://{host}:{port}")
+    ThreadingHTTPServer((host, port), App).serve_forever()
