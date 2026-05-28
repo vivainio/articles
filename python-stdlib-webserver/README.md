@@ -6,7 +6,7 @@ Sometimes you don't need Flask, FastAPI, or Starlette. You need a 50-line script
 
 Python's `http.server` module already ships with everything you need. The default `BaseHTTPRequestHandler` API is just clunky enough that people reach for Flask instead. With about thirty lines of glue you can turn it into something that looks like a real micro-framework: route decorators, path parameters, JSON in and out.
 
-This article walks through that glue.
+This article walks through that glue. The complete, runnable file is in [`server.py`](server.py) next to this article — copy it and start adding routes.
 
 ## The Bare Minimum
 
