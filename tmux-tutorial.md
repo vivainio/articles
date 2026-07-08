@@ -10,6 +10,31 @@ This tutorial is based on my custom [tmux.conf](https://github.com/vivainio/dotf
 
 Tmux makes it easy to multitask across many projects in different sessions, with one or more Claude Code instances running in each session.
 
+## Installation (Ubuntu)
+
+```bash
+sudo apt update
+sudo apt install tmux
+```
+
+Check the version with `tmux -V`. If you need a newer release than what Ubuntu ships (the config below relies on reasonably recent tmux features like `display-popup`), build from source or grab a backport - see the [tmux wiki](https://github.com/tmux/tmux/wiki/Installing).
+
+## Setting Up tmux.conf
+
+Grab my config and drop it in as `~/.tmux.conf` before you start tmux for the first time:
+
+```bash
+curl -o ~/.tmux.conf https://raw.githubusercontent.com/vivainio/dotfiles/master/tmux.conf
+```
+
+The popups in [Level 5](#level-5-extensibility) call out to `lazygit` and `lf` - install those separately if you want those bindings to work:
+
+```bash
+sudo apt install lazygit lf
+```
+
+(Ubuntu's `apt` may only have an old `lazygit`; if so, install it from the [lazygit releases page](https://github.com/jesseduffield/lazygit/releases) instead.)
+
 ## Custom Prefix
 
 The default tmux prefix `Ctrl+b` is replaced with `Ctrl+Space`. This is more ergonomic and allows you to execute all chords quickly. Combined with Alt+arrow navigation, everything becomes even easier.
