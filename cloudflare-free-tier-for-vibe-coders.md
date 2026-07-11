@@ -12,32 +12,45 @@ For a vibe-coding session with Claude Code, the pitch is: you describe an app, g
 
 ### Pages - static hosting + your backend, one deploy
 
-[Pages](https://developers.cloudflare.com/pages/) hosts your static site (`wrangler pages deploy web`) and, if you drop files in a `functions/` directory, gives you serverless API routes for free - `functions/api/push.js` becomes `POST /api/push`, no router to configure. Free plan:
+[Pages](https://developers.cloudflare.com/pages/) hosts your static site (`wrangler pages deploy web`) and, if you drop files in a `functions/` directory, gives you serverless API routes for free - `functions/api/push.ts` becomes `POST /api/push`, no router to configure. Free plan:
 
 - 500 builds/month, 20 min build timeout
 - 100 custom domains per project
 - 25 MiB per static file
 - Functions requests count against your Workers request quota, not a separate one
 
-This is the whole backend for tmux-tower: a `web/` folder of vanilla HTML/CSS/JS and a `functions/api/*.js` folder of one-function-per-file handlers. No framework, no build step required at all if you don't want one.
+This is the whole backend for tmux-tower: a `web/` folder of static HTML/CSS/JS and a `functions/api/*.ts` folder of one-function-per-file handlers. No framework, no bundler config to write - Pages Functions accept TypeScript natively and strip the types at deploy time with the same esbuild pipeline that compiles a plain Worker, so `.ts` here is a drop-in rename, not a build step you have to invent.
 
-A handler is just an exported function per HTTP method, with bindings (D1, R2, ...) arriving on `env`:
+A handler is just an exported function per HTTP method, with bindings (D1, R2, ...) arriving on a typed `env`:
 
-```js
-// functions/api/sessions.js -> GET /api/sessions
-export async function onRequestGet({ env }) {
+```ts
+// functions/api/sessions.ts -> GET /api/sessions
+interface SessionRow {
+  id: string;
+  name: string;
+  updated_at: string;
+}
+
+export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   const { results } = await env.TOWER_DB
     .prepare("SELECT id, name, updated_at FROM sessions ORDER BY updated_at DESC")
-    .all();
+    .all<SessionRow>();
   return Response.json(results);
-}
+};
 ```
+
+`Env` isn't hand-written - `npx wrangler types` reads your `wrangler.toml` bindings and generates a `worker-configuration.d.ts` with a matching `Env` interface (`TOWER_DB: D1Database`, `DOCS_BUCKET: R2Bucket`, etc.), so `env.TOWER_DB.prepare(...)` is fully typed and a typo in a binding name is a compile error instead of a 3am `undefined is not a function`. It's generated, not committed - regenerate it whenever `wrangler.toml` changes, same idea as a lockfile.
 
 No auth code in there at all - Access sits in front of the hostname, so if the request reached this function it's already authenticated. The one route that bypasses Access (the CLI push endpoint, machine-to-machine) checks its own key instead:
 
-```js
-// functions/api/push.js -> POST /api/push (Access: Bypass, key-gated in code)
-export async function onRequestPost({ request, env }) {
+```ts
+// functions/api/push.ts -> POST /api/push (Access: Bypass, key-gated in code)
+interface PushBody {
+  id: string;
+  name: string;
+}
+
+export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const key = request.headers.get("x-api-key");
   if (!key) return new Response("Missing key", { status: 401 });
 
@@ -48,7 +61,7 @@ export async function onRequestPost({ request, env }) {
     .first();
   if (!row) return new Response("Invalid key", { status: 401 });
 
-  const body = await request.json();
+  const body = await request.json<PushBody>();
   await env.TOWER_DB
     .prepare(
       "INSERT INTO sessions (id, name, updated_at) VALUES (?, ?, datetime('now')) " +
@@ -58,15 +71,17 @@ export async function onRequestPost({ request, env }) {
     .run();
 
   return Response.json({ ok: true });
-}
+};
 
-async function sha256(text) {
+async function sha256(text: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 ```
 
-File path is the route (`functions/api/push.js` -> `/api/push`), `[id].js` gives you a dynamic segment in `params.id`, and `onRequestGet`/`onRequestPost` take precedence over a catch-all `onRequest` if you define both.
+File path is the route (`functions/api/push.ts` -> `/api/push`), `[id].ts` gives you a dynamic segment in `params.id` (typed as `string | string[]`, so narrow it before using it), and `onRequestGet`/`onRequestPost` take precedence over a catch-all `onRequest` if you define both.
+
+The one place TypeScript *doesn't* come free is the client-side script tags in `web/` - those are plain `<script src="app.js">` includes with no module system, and a browser can't run `.ts` directly. Converting that half means owning a small build step yourself: TS source under `src/`, a `tsconfig.json` with `outDir: "web"` and `module: "commonjs"` (files with no top-level `import`/`export` still compile to plain global scripts, matching the existing non-module `<script>` setup), and a `build` npm script that runs before `dev`/`deploy`. The compiled `web/*.js` becomes gitignored build output instead of committed source, same as the generated `Env` type.
 
 ### Workers - the compute underneath everything
 
@@ -153,16 +168,6 @@ tmux-tower CLI --(HTTPS POST, key-gated)--> /api/push (Pages Function, Access By
 ```
 
 Static site + API + database + auth, and the entire thing runs comfortably inside the free tier for a single-user tool. `wrangler pages deploy web` and `wrangler d1 execute ... --remote --file=schema.sql` are the only two commands standing between "idea" and "deployed."
-
-## The practical gotchas
-
-A few things that cost me real debugging time, in case they save you some:
-
-- **`wrangler pages dev` and `wrangler d1 execute --local` use different local SQLite files** even for the "same" database, because their persistence-directory hashing differs. If your local schema seems to vanish, check `.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite` for multiple files and apply your migration to whichever one is empty.
-- **Deploy-specific `*.pages.dev` URLs never update.** Every `wrangler pages deploy` prints a fresh, permanent subdomain frozen at that exact commit. Your actual users should only ever see your real domain (or the bare `project.pages.dev` alias, which does track the latest production deploy) - don't save a deploy-hash URL as your app's configured "server URL" anywhere, or it'll silently stop getting your updates.
-- **SQLite string comparison and ISO8601 timestamps don't mix safely.** If you store `updated_at` as `new Date().toISOString()` (with a `T` and `Z`) and later compare against SQLite's `datetime('now', '-1 day')` (space-separated, no `Z`), raw `<=`/`>` string comparison can give wrong answers on same-day boundaries. Wrap both sides in `datetime(...)` to normalize before comparing.
-- **R2 needs a one-time opt-in per account before the API works at all.** Even with `wrangler` authenticated and other products (D1, Pages) already deployed, `wrangler r2 bucket create` failed with `error code: 10042` until I enabled R2 once in the dashboard. It's a checkbox, not a billing gate - but it'll block a from-scratch deploy script the first time, so do it before you script around it.
-- **SQLite's `ALTER TABLE` can't drop `NOT NULL`.** If a column needs to become nullable after you've already deployed the table (e.g. because content moved from D1 to R2), `CREATE TABLE IF NOT EXISTS` in your schema file is a no-op against the existing remote table - you have to manually `CREATE TABLE ... AS SELECT`, drop the old table, and rename, since D1 is plain SQLite under the hood and inherits its `ALTER TABLE` limitations.
 
 ## Where it stops being free
 
