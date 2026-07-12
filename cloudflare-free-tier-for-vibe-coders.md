@@ -2,7 +2,7 @@
 
 *2026-07-11*
 
-I built and shipped [outpost](https://github.com/vivainio/outpost) - a small web app that lets me peek at my tmux sessions (and pushed docs) from a browser - entirely on Cloudflare's free tier. No credit card, no "free trial that becomes a bill in 30 days," just a `wrangler login` and a `wrangler.toml`. This is a rundown of what's actually in the free tier, based on that build, with the numbers that matter.
+I built and shipped outpost - a small web app that lets me peek at my tmux sessions (and pushed docs) from a browser - entirely on Cloudflare's free tier. The site itself is a private deploy, but the [push-to-outpost](https://github.com/vivainio/push-to-outpost) CLI that talks to it is public and explains the shape of the thing. No credit card, no "free trial that becomes a bill in 30 days," just a `wrangler login` and a `wrangler.toml`. This is a rundown of what's actually in the free tier, based on that build, with the numbers that matter.
 
 ## Why Cloudflare specifically
 
