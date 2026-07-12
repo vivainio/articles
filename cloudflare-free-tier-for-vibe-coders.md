@@ -10,47 +10,49 @@ For a vibe-coding session with Claude Code, the pitch is: you describe an app, g
 
 ## The pieces
 
-### Pages - static hosting + your backend, one deploy
+### Workers + static assets - static hosting and your backend, one deploy
 
-[Pages](https://developers.cloudflare.com/pages/) hosts your static site (`wrangler pages deploy web`) and, if you drop files in a `functions/` directory, gives you serverless API routes for free - `functions/api/push.ts` becomes `POST /api/push`, no router to configure. Free plan:
+[Workers](https://developers.cloudflare.com/workers/) can serve a whole static site directly - point a `[assets]` block in `wrangler.toml` at a directory and `wrangler deploy` ships both the static files and your API code as one Worker. Free plan:
 
-- 500 builds/month, 20 min build timeout
-- 100 custom domains per project
+- 100,000 requests/day (assets and Worker code share this)
+- 100 custom domains per account
 - 25 MiB per static file
-- Functions requests count against your Workers request quota, not a separate one
+- No separate build/deploy step for assets - they're just uploaded alongside the Worker
 
-This is the whole backend for tmux-tower: a `web/` folder of static HTML/CSS/JS and a `functions/api/*.ts` folder of one-function-per-file handlers. No framework, no bundler config to write - Pages Functions accept TypeScript natively and strip the types at deploy time with the same esbuild pipeline that compiles a plain Worker, so `.ts` here is a drop-in rename, not a build step you have to invent.
+I actually started tmux-tower on Cloudflare Pages, which did this with file-based routing - drop a file in `functions/api/push.ts` and it became `POST /api/push`, no router to write. Pages is being phased towards Workers as the primary platform, so I migrated: one `worker/index.ts` file with static assets served straight from `web/`, and API routes matched by hand against `request.url` instead of by file path. It's a few more lines than file-based routing, but it's one file to read top-to-bottom instead of nine, and there's no more guessing which of `onRequest`/`onRequestGet`/a catch-all wins.
 
-A handler is just an exported function per HTTP method, with bindings (D1, R2, ...) arriving on a typed `env`:
+The whole backend is that one `worker/index.ts` plus a `web/` folder of static HTML/CSS/JS. No framework, no bundler config to write - Wrangler accepts TypeScript natively and strips the types at deploy time with the same esbuild pipeline it always used for Workers, so `.ts` here is a drop-in rename, not a build step you have to invent.
+
+The whole thing is a single exported `fetch` handler, with bindings (D1, R2, ...) arriving on a typed `env`. Static assets never even reach this code - unmatched requests only fall through to the Worker when there's no matching file in `web/`:
 
 ```ts
-// functions/api/sessions.ts -> GET /api/sessions
+// worker/index.ts
 interface SessionRow {
   id: string;
   name: string;
   updated_at: string;
 }
 
-export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
+async function getSessions(env: Env): Promise<Response> {
   const { results } = await env.TOWER_DB
     .prepare("SELECT id, name, updated_at FROM sessions ORDER BY updated_at DESC")
     .all<SessionRow>();
   return Response.json(results);
-};
+}
 ```
 
-`Env` isn't hand-written - `npx wrangler types` reads your `wrangler.toml` bindings and generates a `worker-configuration.d.ts` with a matching `Env` interface (`TOWER_DB: D1Database`, `DOCS_BUCKET: R2Bucket`, etc.), so `env.TOWER_DB.prepare(...)` is fully typed and a typo in a binding name is a compile error instead of a 3am `undefined is not a function`. It's generated, not committed - regenerate it whenever `wrangler.toml` changes, same idea as a lockfile.
+`Env` isn't hand-written - `npx wrangler types` reads your `wrangler.toml` bindings (including the `[assets]` block) and generates a `worker-configuration.d.ts` with a matching `Env` interface (`TOWER_DB: D1Database`, `DOCS_BUCKET: R2Bucket`, etc.), so `env.TOWER_DB.prepare(...)` is fully typed and a typo in a binding name is a compile error instead of a 3am `undefined is not a function`. It's generated, not committed - regenerate it whenever `wrangler.toml` changes, same idea as a lockfile.
 
-No auth code in there at all - Access sits in front of the hostname, so if the request reached this function it's already authenticated. The one route that bypasses Access (the CLI push endpoint, machine-to-machine) checks its own key instead:
+No auth code in there at all - Access sits in front of the hostname, so if the request reached this handler it's already authenticated. The one route that bypasses Access (the CLI push endpoint, machine-to-machine) checks its own key instead:
 
 ```ts
-// functions/api/push.ts -> POST /api/push (Access: Bypass, key-gated in code)
+// worker/index.ts - POST /api/push (Access: Bypass, key-gated in code)
 interface PushBody {
   id: string;
   name: string;
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+async function postPush(request: Request, env: Env): Promise<Response> {
   const key = request.headers.get("x-api-key");
   if (!key) return new Response("Missing key", { status: 401 });
 
@@ -71,21 +73,38 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .run();
 
   return Response.json({ ok: true });
-};
+}
 
 async function sha256(text: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-```
 
-File path is the route (`functions/api/push.ts` -> `/api/push`), `[id].ts` gives you a dynamic segment in `params.id` (typed as `string | string[]`, so narrow it before using it), and `onRequestGet`/`onRequestPost` take precedence over a catch-all `onRequest` if you define both.
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const { pathname } = new URL(request.url);
+    if (pathname === "/api/sessions" && request.method === "GET") return getSessions(env);
+    if (pathname === "/api/push" && request.method === "POST") return postPush(request, env);
+    return new Response("Not found", { status: 404 });
+  },
+} satisfies ExportedHandler<Env>;
+```
 
 The one place TypeScript *doesn't* come free is the client-side script tags in `web/` - those are plain `<script src="app.js">` includes with no module system, and a browser can't run `.ts` directly. Converting that half means owning a small build step yourself: TS source under `src/`, a `tsconfig.json` with `outDir: "web"` and `module: "commonjs"` (files with no top-level `import`/`export` still compile to plain global scripts, matching the existing non-module `<script>` setup), and a `build` npm script that runs before `dev`/`deploy`. The compiled `web/*.js` becomes gitignored build output instead of committed source, same as the generated `Env` type.
 
+### Workers Builds - git-connected deploys, no secrets to manage
+
+I'd been running `wrangler deploy` from a GitHub Actions workflow with a `CLOUDFLARE_API_TOKEN` secret, the standard approach everywhere it's documented. Cloudflare also has a native git integration - [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/) - that skips GitHub Actions entirely: connect the repo from the dashboard (Workers & Pages → your Worker → Settings → Builds → Connect), Cloudflare's own GitHub App handles the push events, and it deploys on every push without a workflow file or a token sitting in your repo's secrets. Free plan:
+
+- 3,000 build minutes/month, 1 concurrent build, 20-minute build timeout
+
+Feature branches and PRs get their own deploys for free - `npx wrangler versions upload` instead of a full `wrangler deploy`, with the resulting preview URL posted straight into a PR comment (a commit-scoped URL and a branch-scoped one). No OIDC/trusted-publishing like PyPI's - the docs still only describe API tokens for the GitHub Actions path - but Workers Builds sidesteps the whole question since there's no token to leak in the first place.
+
+The pleasant surprise: those preview `workers.dev` URLs still redirected to Cloudflare Access login when I checked, meaning Access was covering the whole `*.<subdomain>.workers.dev` pattern, not just the one hostname I'd pointed an Application at - the exact hazard called out above under Zero Trust didn't materialize here. Worth confirming on your own setup rather than assuming, since Access matching is per-hostname and this depends on how broadly your policy's been scoped.
+
 ### Workers - the compute underneath everything
 
-Even if you never write a Worker directly, Pages Functions *are* Workers under the hood, so these are the numbers that actually gate you:
+These are the numbers that actually gate a Worker, static assets or not:
 
 - 100,000 requests/day (resets at midnight UTC)
 - 10ms CPU time per request (wall-clock time waiting on I/O - like a D1 query - doesn't count against this)
@@ -143,9 +162,9 @@ That's enough for a lot of casual embedding generation or small-model inference 
 
 This is the one that saved me the most actual work on tmux-tower. [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) sits in front of your domain and requires login (email OTP, Google, GitHub, whatever identity provider you wire up) *before a request even reaches your app*. Free plan: **50 users, no time limit.**
 
-For tmux-tower this means the entire site has zero app-level login code - no session cookies to manage, no password hashing, no "forgot password" flow. I just point an Access Application at `tmux-tower.pages.dev`, set a policy of "allow my email only," and every request that reaches my Pages Functions is already authenticated. For a single-user hobby tool this is enormously simpler than writing auth, and even at 50 users it's still free - plenty for "share this internal tool with my team."
+For tmux-tower this means the entire site has zero app-level login code - no session cookies to manage, no password hashing, no "forgot password" flow. I just point an Access Application at `tmux-tower.<subdomain>.workers.dev`, set a policy of "allow my email only," and every request that reaches my Worker is already authenticated. For a single-user hobby tool this is enormously simpler than writing auth, and even at 50 users it's still free - plenty for "share this internal tool with my team."
 
-The catch (and this bit me for real building tmux-tower): **an Access Application only matches the exact hostname you give it.** Cloudflare Pages gives every single deployment - including old ones from months ago - a permanent unique subdomain like `81f1467b.tmux-tower.pages.dev`, and none of them inherit the Access policy on your main domain unless you explicitly cover them. I had `/api/keys` (a GET *and POST* endpoint with zero app-level auth, relying entirely on Access) sitting wide open on every old deploy subdomain for a while before catching it. If you use Access, protect `*.yourproject.pages.dev` as a *separate application* in addition to the bare domain - one Access app can only hold one hostname pattern (exact match *or* wildcard, not both), so budget for two apps, not one.
+The catch (and this bit me for real, back when tmux-tower was still on Pages): **an Access Application only matches the exact hostname you give it.** Cloudflare Pages gives every single deployment - including old ones from months ago - a permanent unique subdomain like `81f1467b.tmux-tower.pages.dev`, and none of them inherit the Access policy on your main domain unless you explicitly cover them. I had `/api/keys` (a GET *and POST* endpoint with zero app-level auth, relying entirely on Access) sitting wide open on every old deploy subdomain for a while before catching it. This is one of the reasons I moved to Workers with static assets instead: a plain `wrangler deploy` overwrites the same `workers.dev` URL rather than minting a new immutable one per deploy, so there's no fleet of forgotten unprotected subdomains to audit. (Pages-style immutable preview URLs still exist on Workers if you opt into gradual deployments/Versions - just not by default.) If you're still on Pages, protect `*.yourproject.pages.dev` as a *separate application* in addition to the bare domain - one Access app can only hold one hostname pattern (exact match *or* wildcard, not both), so budget for two apps, not one.
 
 For machine-to-machine calls that can't do an interactive login (my local push agent, for instance), give that one route its own Access Application scoped to just that path with a **Bypass** policy, and gate it with your own API key check inside the function instead. That's what `/api/push` does in tmux-tower - it's the one route Access doesn't touch, and it checks a hashed API key from D1 on every request.
 
@@ -158,16 +177,16 @@ Didn't need it here, but worth knowing about: [Turnstile](https://developers.clo
 The tmux-tower stack, entirely free-tier:
 
 ```
-tmux-tower CLI --(HTTPS POST, key-gated)--> /api/push (Pages Function, Access Bypass)
+tmux-tower CLI --(HTTPS POST, key-gated)--> /api/push (Worker route, Access Bypass)
                                                     |
                                     Cloudflare D1  +  R2 (zip doc blobs)
                                                     |
-                     /api/sessions, /api/docs, /api/keys (Pages Functions, gated by Access)
+                     /api/sessions, /api/docs, /api/keys (Worker routes, gated by Access)
                                                     |
-                                        web/ (static site, Pages)
+                                web/ (static assets, served by the same Worker)
 ```
 
-Static site + API + database + auth, and the entire thing runs comfortably inside the free tier for a single-user tool. `wrangler pages deploy web` and `wrangler d1 execute ... --remote --file=schema.sql` are the only two commands standing between "idea" and "deployed."
+Static site + API + database + auth, and the entire thing runs comfortably inside the free tier for a single-user tool. `wrangler deploy` and `wrangler d1 execute ... --remote --file=schema.sql` are the only two commands standing between "idea" and "deployed."
 
 ## Where it stops being free
 
