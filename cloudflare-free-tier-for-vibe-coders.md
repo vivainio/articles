@@ -2,7 +2,7 @@
 
 *2026-07-11*
 
-I built and shipped [tmux-tower](https://github.com/vivainio/tmux-tower) - a small web app that lets me peek at my tmux sessions from a browser - entirely on Cloudflare's free tier. No credit card, no "free trial that becomes a bill in 30 days," just a `wrangler login` and a `wrangler.toml`. This is a rundown of what's actually in the free tier, based on that build, with the numbers that matter and the gotchas nobody tells you about.
+I built and shipped [outpost](https://github.com/vivainio/outpost) - a small web app that lets me peek at my tmux sessions (and pushed docs) from a browser - entirely on Cloudflare's free tier. No credit card, no "free trial that becomes a bill in 30 days," just a `wrangler login` and a `wrangler.toml`. This is a rundown of what's actually in the free tier, based on that build, with the numbers that matter.
 
 ## Why Cloudflare specifically
 
@@ -19,9 +19,9 @@ For a vibe-coding session with Claude Code, the pitch is: you describe an app, g
 - 25 MiB per static file
 - No separate build/deploy step for assets - they're just uploaded alongside the Worker
 
-I actually started tmux-tower on Cloudflare Pages, which did this with file-based routing - drop a file in `functions/api/push.ts` and it became `POST /api/push`, no router to write. Pages is being phased towards Workers as the primary platform, so I migrated: one `worker/index.ts` file with static assets served straight from `web/`, and API routes matched by hand against `request.url` instead of by file path. It's a few more lines than file-based routing, but it's one file to read top-to-bottom instead of nine, and there's no more guessing which of `onRequest`/`onRequestGet`/a catch-all wins.
+The backend is one `worker/index.ts` file, with API routes matched by hand against `request.url` instead of file-based routing - one file to read top-to-bottom, no guessing which of `onRequest`/`onRequestGet`/a catch-all wins. Wrangler accepts TypeScript natively and strips the types at deploy time with the same esbuild pipeline it always used for Workers, so `.ts` here is a drop-in rename, not a build step you have to invent.
 
-The whole backend is that one `worker/index.ts` plus a `web/` folder of static HTML/CSS/JS. No framework, no bundler config to write - Wrangler accepts TypeScript natively and strips the types at deploy time with the same esbuild pipeline it always used for Workers, so `.ts` here is a drop-in rename, not a build step you have to invent.
+The frontend is a small Preact + Vite app under `ui/` (components, a `lib/` of API/crypto/zip/markdown helpers), built to static files in `web/` by `vite build`. A second Vite config (`vite.viewer.config.ts`) builds the doc viewer that runs inside a sandboxed iframe as a fully separate bundle, on purpose - that iframe runs with an opaque origin (`sandbox="allow-scripts"`, no `allow-same-origin`) and can't load cross-chunk ES module imports, so it can't share a chunk with the main app's build. `npm run build` runs both, then `wrangler deploy` ships the resulting `web/` alongside the Worker as one deploy.
 
 The whole thing is a single exported `fetch` handler, with bindings (D1, R2, ...) arriving on a typed `env`. Static assets never even reach this code - unmatched requests only fall through to the Worker when there's no matching file in `web/`:
 
@@ -90,17 +90,13 @@ export default {
 } satisfies ExportedHandler<Env>;
 ```
 
-The one place TypeScript *doesn't* come free is the client-side script tags in `web/` - those are plain `<script src="app.js">` includes with no module system, and a browser can't run `.ts` directly. Converting that half means owning a small build step yourself: TS source under `src/`, a `tsconfig.json` with `outDir: "web"` and `module: "commonjs"` (files with no top-level `import`/`export` still compile to plain global scripts, matching the existing non-module `<script>` setup), and a `build` npm script that runs before `dev`/`deploy`. The compiled `web/*.js` becomes gitignored build output instead of committed source, same as the generated `Env` type.
-
 ### Workers Builds - git-connected deploys, no secrets to manage
 
-I'd been running `wrangler deploy` from a GitHub Actions workflow with a `CLOUDFLARE_API_TOKEN` secret, the standard approach everywhere it's documented. Cloudflare also has a native git integration - [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/) - that skips GitHub Actions entirely: connect the repo from the dashboard (Workers & Pages → your Worker → Settings → Builds → Connect), Cloudflare's own GitHub App handles the push events, and it deploys on every push without a workflow file or a token sitting in your repo's secrets. Free plan:
+Cloudflare has a native git integration - [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/) - that skips GitHub Actions entirely: connect the repo from the dashboard (Workers & Pages → your Worker → Settings → Builds → Connect), Cloudflare's own GitHub App handles the push events, and it deploys on every push without a workflow file or a token sitting in your repo's secrets. Free plan:
 
 - 3,000 build minutes/month, 1 concurrent build, 20-minute build timeout
 
 Feature branches and PRs get their own deploys for free - `npx wrangler versions upload` instead of a full `wrangler deploy`, with the resulting preview URL posted straight into a PR comment (a commit-scoped URL and a branch-scoped one). No OIDC/trusted-publishing like PyPI's - the docs still only describe API tokens for the GitHub Actions path - but Workers Builds sidesteps the whole question since there's no token to leak in the first place.
-
-The pleasant surprise: those preview `workers.dev` URLs still redirected to Cloudflare Access login when I checked, meaning Access was covering the whole `*.<subdomain>.workers.dev` pattern, not just the one hostname I'd pointed an Application at - the exact hazard called out above under Zero Trust didn't materialize here. Worth confirming on your own setup rather than assuming, since Access matching is per-hostname and this depends on how broadly your policy's been scoped.
 
 ### Workers - the compute underneath everything
 
@@ -120,7 +116,7 @@ These are the numbers that actually gate a Worker, static assets or not:
 - 5GB total storage, 500MB per database, 10 databases per account
 - 5 million rows read/day, 100,000 rows written/day
 
-That write quota is the one to actually watch for a chatty app - a tmux-pane-pusher polling every 15 seconds and updating a handful of rows each time is nowhere near it, but a naive "log every event" design could burn through 100K writes fast. It's plain SQL (`wrangler d1 execute`, or `env.TOWER_DB.prepare(...).bind(...).run()` from a Worker) - no ORM required, no separate database server to provision.
+That write quota is the one to actually watch for a chatty app - outpost's CLI polling every 15 seconds and updating a handful of rows each time is nowhere near it, but a naive "log every event" design could burn through 100K writes fast. It's plain SQL (`wrangler d1 execute`, or `env.TOWER_DB.prepare(...).bind(...).run()` from a Worker) - no ORM required, no separate database server to provision.
 
 ### KV - a global, eventually-consistent cache
 
@@ -138,7 +134,7 @@ The write quota is tiny - KV is built for read-heavy, write-rarely data. Don't u
 - 10GB-month storage
 - 1M Class A operations/month (writes/lists), 10M Class B operations/month (reads)
 
-I ended up using it for exactly the blob-storage case I was expecting: tmux-tower can now push zip files as docs, and those go to R2 instead of D1 - D1 rows aren't a good fit for arbitrary binary blobs, and storing them base64-in-TEXT wastes a third of the space for nothing. The bucket keys are just the doc id, and a one-line lifecycle rule (`wrangler r2 bucket create tmux-tower-docs` then `wrangler r2 bucket lifecycle add tmux-tower-docs expire-1d --expire-days 1`) auto-deletes objects a day after their last write, which happens to line up perfectly with re-pushing a doc resetting that clock - no cron trigger needed to keep storage from growing forever. Free-tier limits above cover this with room to spare for anything hobby-sized; no separate bucket-billing surprise waiting six months later when someone downloads a file a lot.
+outpost uses it for exactly the blob-storage case that fits: pushed zip docs go to R2 instead of D1 - D1 rows aren't a good fit for arbitrary binary blobs, and storing them base64-in-TEXT wastes a third of the space for nothing. The bucket keys are just the doc id, and a one-line lifecycle rule (`wrangler r2 bucket lifecycle add outpost-docs expire-1d --expire-days 1`) auto-deletes objects a day after their last write, which lines up with re-pushing a doc resetting that clock - no cron trigger needed to keep storage from growing forever. Free-tier limits above cover this with room to spare for anything hobby-sized.
 
 ### Durable Objects - stateful coordination, now free-tier eligible
 
@@ -148,7 +144,7 @@ I ended up using it for exactly the blob-storage case I was expecting: tmux-towe
 - ~100K requests/day, ~150M rows read/month, ~3M rows written/month
 - Each incoming request resets a 30-second CPU budget for that object
 
-I didn't need this for tmux-tower (D1 + polling was enough), but it's the thing to reach for if "everyone editing the same doc in real time" shows up in a future vibe-coding session.
+outpost doesn't need this (D1 + polling is enough), but it's the thing to reach for if "everyone editing the same doc in real time" shows up in a future vibe-coding session.
 
 ### Workers AI - free inference at the edge
 
@@ -160,13 +156,11 @@ That's enough for a lot of casual embedding generation or small-model inference 
 
 ### Zero Trust / Access - free auth, no login code
 
-This is the one that saved me the most actual work on tmux-tower. [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) sits in front of your domain and requires login (email OTP, Google, GitHub, whatever identity provider you wire up) *before a request even reaches your app*. Free plan: **50 users, no time limit.**
+This is the one that saved the most actual work on outpost. [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) sits in front of your domain and requires login (email OTP, Google, GitHub, whatever identity provider you wire up) *before a request even reaches your app*. Free plan: **50 users, no time limit.**
 
-For tmux-tower this means the entire site has zero app-level login code - no session cookies to manage, no password hashing, no "forgot password" flow. I just point an Access Application at `tmux-tower.<subdomain>.workers.dev`, set a policy of "allow my email only," and every request that reaches my Worker is already authenticated. For a single-user hobby tool this is enormously simpler than writing auth, and even at 50 users it's still free - plenty for "share this internal tool with my team."
+For outpost this means the entire site has zero app-level login code - no session cookies to manage, no password hashing, no "forgot password" flow. An Access Application points at `outpost.<subdomain>.workers.dev`, path `/*`, with a policy of "allow my email only," so every request that reaches the Worker is already authenticated. For a single-user hobby tool this is enormously simpler than writing auth, and even at 50 users it's still free - plenty for "share this internal tool with my team."
 
-The catch (and this bit me for real, back when tmux-tower was still on Pages): **an Access Application only matches the exact hostname you give it.** Cloudflare Pages gives every single deployment - including old ones from months ago - a permanent unique subdomain like `81f1467b.tmux-tower.pages.dev`, and none of them inherit the Access policy on your main domain unless you explicitly cover them. I had `/api/keys` (a GET *and POST* endpoint with zero app-level auth, relying entirely on Access) sitting wide open on every old deploy subdomain for a while before catching it. This is one of the reasons I moved to Workers with static assets instead: a plain `wrangler deploy` overwrites the same `workers.dev` URL rather than minting a new immutable one per deploy, so there's no fleet of forgotten unprotected subdomains to audit. (Pages-style immutable preview URLs still exist on Workers if you opt into gradual deployments/Versions - just not by default.) If you're still on Pages, protect `*.yourproject.pages.dev` as a *separate application* in addition to the bare domain - one Access app can only hold one hostname pattern (exact match *or* wildcard, not both), so budget for two apps, not one.
-
-For machine-to-machine calls that can't do an interactive login (my local push agent, for instance), give that one route its own Access Application scoped to just that path with a **Bypass** policy, and gate it with your own API key check inside the function instead. That's what `/api/push` does in tmux-tower - it's the one route Access doesn't touch, and it checks a hashed API key from D1 on every request.
+**An Access Application matches by hostname and path**, and matching is most-specific-path-wins. For machine-to-machine calls that can't do an interactive login (the local CLI's push agent), a second Application is scoped to just `/api/push` with a **Bypass** policy, and that one route checks its own hashed API key against D1 instead - it's the one route Access doesn't touch. Because a plain `wrangler deploy` overwrites the same `workers.dev` URL rather than minting a new one per deploy, there's exactly one hostname to cover with these two Applications, not a growing set of old preview subdomains.
 
 ### Turnstile - free CAPTCHA
 
@@ -174,19 +168,19 @@ Didn't need it here, but worth knowing about: [Turnstile](https://developers.clo
 
 ## What this looks like put together
 
-The tmux-tower stack, entirely free-tier:
+The outpost stack, entirely free-tier:
 
 ```
-tmux-tower CLI --(HTTPS POST, key-gated)--> /api/push (Worker route, Access Bypass)
-                                                    |
-                                    Cloudflare D1  +  R2 (zip doc blobs)
-                                                    |
-                     /api/sessions, /api/docs, /api/keys (Worker routes, gated by Access)
-                                                    |
-                                web/ (static assets, served by the same Worker)
+push-to-outpost CLI --(HTTPS POST, key-gated)--> /api/push (Worker route, Access Bypass)
+                                                          |
+                                          Cloudflare D1  +  R2 (zip doc blobs)
+                                                          |
+                       /api/sessions, /api/docs, /api/keys (Worker routes, gated by Access)
+                                                          |
+                          web/ (Preact app, built by Vite, served by the same Worker)
 ```
 
-Static site + API + database + auth, and the entire thing runs comfortably inside the free tier for a single-user tool. `wrangler deploy` and `wrangler d1 execute ... --remote --file=schema.sql` are the only two commands standing between "idea" and "deployed."
+The CLI itself is a separate PyPI package (`pip install push-to-outpost`), so the local agent that captures tmux panes and pushes docs has nothing to do with the Cloudflare deploy - it just talks to `/api/push` over HTTPS with an API key minted and revoked from the site's own **API keys** panel. Static site + API + database + auth, and the entire thing runs comfortably inside the free tier for a single-user tool. `wrangler deploy` and `wrangler d1 execute ... --remote --file=schema.sql` are the only two commands standing between "idea" and "deployed."
 
 ## Where it stops being free
 
