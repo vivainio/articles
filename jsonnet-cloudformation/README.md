@@ -784,11 +784,14 @@ to rewrite working infrastructure just to avoid it.
 
 1. Install Jsonnet: `brew install jsonnet` / `apt install jsonnet`
 2. Copy `lib/cfn.libsonnet` and `lib/sls.libsonnet` into your project (and
-   `lib/sam.libsonnet` if you want the SAM-style interface)
+   `lib/sam.libsonnet` if you want the SAM-style interface, or `lib/aws.libsonnet`
+   for clean-room templates with no SLS naming conventions)
 3. Write a `.jsonnet` file importing the library
 4. Render: `jsonnet --ext-str stage=dev my-service.jsonnet > template.json`
 5. Validate: `aws cloudformation validate-template --template-body file://template.json`
-6. Deploy: `aws cloudformation deploy --template-file template.json --stack-name my-service-dev --capabilities CAPABILITY_NAMED_IAM`
+6. Package: `aws cloudformation package --template-file template.json --s3-bucket my-deploy-bucket --output-template-file packaged.json`
+   (uploads Lambda code referenced by local paths, rewrites `Code` to S3 URIs)
+7. Deploy: `aws cloudformation deploy --template-file packaged.json --stack-name my-service-dev --capabilities CAPABILITY_NAMED_IAM`
 
 ## Caveats
 

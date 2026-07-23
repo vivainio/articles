@@ -229,24 +229,44 @@ state patterns (e.g. Wait → Task → Verify loops).
 
 ## Build/deploy pipeline
 
-### `sls package`
+### `sls package` + `sls deploy --package`
 
-Generates CloudFormation JSON + packages code into a zip. Writes to
-`.serverless/` or a `--package` output directory. Resolves all `${self:...}`
-interpolation at this point.
+`sls package` generates CloudFormation JSON, bundles Lambda code into a zip,
+and resolves all `${self:...}` interpolation. `sls deploy --package` uploads
+the zip to S3, uploads the template, and creates/updates the CloudFormation
+stack. When used with the `sed` pattern, the deploy script patches the
+generated JSON between the two steps.
 
-**Jsonnet replacement:** `jsonnet --ext-str stage=... template.jsonnet > template.json`.
-Code packaging is a separate build step (zip + upload to S3).
+**Jsonnet replacement:** two standard AWS CLI commands:
 
-### `sls deploy --package`
+```bash
+# 1. Render the template
+jsonnet --ext-str stage=dev template.jsonnet > template.json
 
-Uploads the pre-packaged artifact to S3 and creates/updates the
-CloudFormation stack. When used with the `sed` pattern, the deploy script
-patches the generated JSON before calling `sls deploy`.
+# 2. Package and deploy
+#    - Zips local code paths referenced in the template (e.g. Code: ./src/)
+#    - Uploads the zip to S3 with a content-addressed key
+#    - Rewrites the template with the S3 URI
+aws cloudformation package \
+  --template-file template.json \
+  --s3-bucket my-deploy-bucket \
+  --output-template-file packaged.json
 
-**Jsonnet replacement:**
-`aws cloudformation deploy --template-file template.json --stack-name ... --capabilities CAPABILITY_NAMED_IAM`.
-Or `sam deploy --template-file template.json` if targeting SAM output.
+aws cloudformation deploy \
+  --template-file packaged.json \
+  --stack-name my-service-dev \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+`aws cloudformation package` handles the code upload that `sls deploy` did
+implicitly. It scans the template for local file paths on `Code`, `CodeUri`,
+etc., uploads them to S3, and rewrites the references. The output template
+is plain CloudFormation JSON ready for `deploy`. If the code hasn't changed,
+the content-addressed S3 key stays the same and CloudFormation skips the
+Lambda update — a no-op, which is the correct behavior.
+
+Or use `sam deploy --resolve-s3` if targeting SAM output, which combines both
+steps.
 
 ### Post-deploy orchestration
 
