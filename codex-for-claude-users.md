@@ -33,7 +33,69 @@ approvals_reviewer = "auto_review"
 
 This is deliberately narrower than turning off safety checks. The reviewer can reject an escalation, and the sandbox still defines what an un-escalated command may access. In other words, auto mode removes routine confirmation clicks; it does not mean that every command automatically receives unrestricted access.
 
-Because this is a persistent config setting, it applies when you start a new Codex session. There is no need to press `Shift+Tab` after launching Codex in each repository.
+Because this is a persistent config setting, it applies when you start a new
+Codex session. There is no need to press `Shift+Tab` after launching Codex in
+each repository. I always use this auto mode; I prefer letting the reviewer
+handle routine escalation decisions instead of interrupting the session for
+manual confirmation.
+
+## Command rules and the automatic reviewer are separate
+
+Claude Code lets you whitelist or blacklist commands. The closest Codex
+equivalent is a set of prefix rules in `~/.codex/rules/default.rules`. Each rule
+can allow a matching command to run outside the sandbox without prompting,
+require a prompt, or forbid it entirely:
+
+```python
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "allow",
+)
+
+prefix_rule(
+    pattern = ["rm"],
+    decision = "forbidden",
+    justification = "Do not delete files automatically.",
+)
+```
+
+Codex applies the most restrictive matching decision: `forbidden`, then
+`prompt`, then `allow`. You can test the result before relying on it:
+
+```bash
+codex execpolicy check --pretty \
+  --rules ~/.codex/rules/default.rules \
+  -- git push
+```
+
+This is distinct from the automatic reviewer. Prefix rules make deterministic
+decisions about known command prefixes; the reviewer classifies approval
+requests that still reach it. Both mechanisms are active at the same time. When
+a command needs to cross the sandbox boundary, an `allow` rule lets it proceed
+without review, a `forbidden` rule blocks it, and a `prompt` decision—or a
+request without a decisive rule—continues to the automatic reviewer. Commands
+already permitted inside the sandbox need neither.
+
+You can also replace the reviewer's local policy:
+
+```toml
+approvals_reviewer = "auto_review"
+
+[auto_review]
+policy = """
+...custom reviewer policy...
+"""
+```
+
+If you do this, start with Codex's complete
+[default reviewer policy](https://github.com/openai/codex/blob/main/codex-rs/core/src/guardian/policy.md)
+and modify it. The setting replaces the local policy rather than adding a small
+preference to it, and an organization-managed policy can take precedence.
+
+Since I always use auto mode, prefix rules are useful mainly for the decisions I
+want to make deterministic before they reach the reviewer. I would use them for
+concrete allow-or-deny choices and customize the reviewer only for broader risk
+judgments. Rules are predictable; the reviewer is still model-based.
 
 ## The status line is worth configuring
 
@@ -58,7 +120,16 @@ status_line = [
 status_line_use_colors = true
 ```
 
-Unlike Claude Code's command-backed status line, Codex currently limits this to its built-in fields. You cannot yet pipe arbitrary JSON into your own formatter script.
+Unlike Claude Code's command-backed status line, Codex currently limits this to
+its built-in fields. You cannot yet pipe arbitrary JSON into your own formatter
+script. In Claude Code I use
+[cship](https://cship.dev/), which turns that flexibility into a polished,
+highly customizable status line.
+
+Even so, I prefer Codex's approach. The built-in fields cover the information I
+actually want, and configuring them directly is simpler than maintaining another
+formatter process, input protocol, and configuration file. Claude Code offers
+more freedom here; Codex gives me the better default experience.
 
 ## Skills, plugins, and MCP
 
