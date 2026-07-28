@@ -10,6 +10,8 @@ This tutorial is based on my custom [herdr config.toml](https://github.com/vivai
 
 Tmux multiplexes terminals. Herdr multiplexes *agents*. When you're running several Claude Code (or Codex, Gemini, etc.) instances across different projects, the thing you actually want to know at a glance is "which of these is stuck waiting for me?" - not just "which panes exist." Herdr's sidebar answers that directly, and its worktree integration means spinning up a new agent on a new branch is a single keystroke instead of a manual `git worktree add` dance.
 
+Herdr is also unusually mouse-friendly for a terminal workspace manager, which makes it easier to learn than many alternatives. Most everyday operations - switching workspaces and panes, resizing, splitting, renaming, zooming, and closing - are available through clicks, dragging, and context menus. You can become productive before learning the keybindings, then adopt shortcuts gradually.
+
 ## Setting Up config.toml
 
 Grab my config and drop it in as `~/.config/herdr/config.toml`, mirroring the way `~/dotfiles/tmux.conf` is linked as `~/.tmux.conf`:
