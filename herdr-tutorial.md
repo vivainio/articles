@@ -55,12 +55,15 @@ Confusingly, Herdr also has a literal "session" concept (`herdr --session <name>
 | Next workspace | `Alt+Down` | Click it in the sidebar |
 | Previous workspace | `Alt+Up` | Click it in the sidebar |
 | Workspace picker | `Prefix + W` | Sidebar already shows this - see below |
+| Goto (session navigator) | `Prefix + G` | - |
 | Rename workspace | `Prefix + Shift+W` | Right-click it in the sidebar (rare - use this) |
 | Close workspace | `Prefix + Shift+K` | - |
 | Detach | `Prefix + Q` | - |
 | Toggle sidebar | `Prefix + B` | - |
 
-`Prefix + W` opens a picker over every workspace. In practice it duplicates what the sidebar already shows you, with no type-to-search and no extra preview - if you keep the sidebar visible, clicking there or using `Alt+Up/Down` is just as fast. Unlike tmux's `Prefix + w` tree view, it's not clearly pulling its weight.
+`Prefix + W` opens a picker over every workspace. In practice it duplicates what the sidebar already shows you, with no type-to-search and no extra preview - if you keep the sidebar visible, clicking there or using `Alt+Up/Down` is just as fast.
+
+`Prefix + G` is the one that's actually equivalent to tmux's `Prefix + w` tree view: it shows workspaces and their panes together, not just a flat workspace list, so it's the better pick when you want to jump straight into a specific pane rather than just a workspace.
 
 ## Level 3: Panes
 
@@ -121,12 +124,16 @@ herdr worktree remove <path>
 
 ## Level 7: Plugins
 
-Herdr has a plugin system for functionality that goes beyond a single popup command. My config uses two:
+Herdr plugins are a standardized way to package and install Herdr-focused tools. They are not uniquely privileged: a normal app or script can also invoke the `herdr` CLI to query workspaces and agents or perform actions. The practical benefits of a plugin are standardized installation, packaged named actions, and convenient keybinding through `type = "plugin_action"`.
+
+My config uses two:
 
 - **[herdr-file-viewer](https://github.com/smarzban/herdr-file-viewer)** - a git-aware, read-only file viewer as a TUI split pane, bound to `Prefix + F` (split) and `Prefix + Shift+F` (own tab).
 - **reviewr** - review agent-written diffs beside the chat and add line comments back into the agent's input, toggled with `Prefix + Ctrl+R`.
 
 Plugins are installed with `herdr plugin install <owner>/<repo>` and bound via `type = "plugin_action"` or a `herdr plugin action invoke` shell command in `config.toml`, the same way the popups above are bound.
+
+There is no lifecycle advantage documented here: unless Herdr provides initialization, cleanup, supervision, or workspace-specific start/stop hooks, a plugin has no special lifecycle capability compared with a normal CLI app.
 
 ## Q&A
 
