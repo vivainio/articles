@@ -30,51 +30,54 @@ Like the tmux config, the default prefix is replaced with `Ctrl+Space`. Since bo
 
 Herdr calls tabs "tabs" (tmux calls them "windows" - same thing):
 
-| Action | Binding |
-|--------|---------|
-| Create new tab | `Prefix + c` |
-| Close current tab | `Prefix + k` |
-| Rename tab | `Prefix + Shift+T` |
-| Next tab | `Alt+Right` |
-| Previous tab | `Alt+Left` |
-| Jump to tab N | `Prefix + 1..9` |
+| Action | Binding | Mouse alternative |
+|--------|---------|--------------------|
+| Create new tab | `Prefix + c` | Click the `+` button in the tab bar |
+| Close current tab | `Prefix + k` | - |
+| Rename tab | `Prefix + Shift+T` | Right-click the tab (rare - use this) |
+| Next tab | `Alt+Right` | Click the tab |
+| Previous tab | `Alt+Left` | Click the tab |
+| Jump to tab N | `Prefix + 1..9` | Click the tab |
 
 No prefix needed for navigation - just hold Alt and press arrow keys, exactly like the tmux config.
 
-Herdr also captures the mouse by default (`ui.mouse_capture = true`): click a tab or workspace in the sidebar to switch to it directly, and right-click one to rename it (double-click does nothing here). That makes the `Rename tab` / `Rename workspace` keybindings below more of a fallback than something you'll reach for.
+Herdr captures the mouse by default (`ui.mouse_capture = true`). Note double-click does nothing here - it's right-click that renames, which is easy to get backwards if you're used to other apps.
 
 ## Level 2: Workspaces
 
 Workspaces are Herdr's equivalent of tmux sessions - a group of tabs for one project or one line of work.
 
-| Action | Binding |
-|--------|---------|
-| New workspace | `Prefix + Shift+N` |
-| Next workspace | `Alt+Down` |
-| Previous workspace | `Alt+Up` |
-| Workspace picker | `Prefix + W` |
-| Rename workspace | `Prefix + Shift+W` |
-| Close workspace | `Prefix + Shift+K` |
-| Detach | `Prefix + Q` |
-| Toggle sidebar | `Prefix + B` |
+Confusingly, Herdr also has a literal "session" concept (`herdr --session <name>`, `herdr session list|attach|stop|delete`) - a separate persistent server/socket, closer to running a second tmux server than to a tmux session. It exists, but since workspaces already give you multiple project groupings inside one Herdr instance, most people never need more than the default session and can ignore this layer entirely.
+
+| Action | Binding | Mouse alternative |
+|--------|---------|--------------------|
+| New workspace | `Prefix + Shift+N` | Click the "New" button in the sidebar |
+| Next workspace | `Alt+Down` | Click it in the sidebar |
+| Previous workspace | `Alt+Up` | Click it in the sidebar |
+| Workspace picker | `Prefix + W` | Sidebar already shows this - see below |
+| Rename workspace | `Prefix + Shift+W` | Right-click it in the sidebar (rare - use this) |
+| Close workspace | `Prefix + Shift+K` | - |
+| Detach | `Prefix + Q` | - |
+| Toggle sidebar | `Prefix + B` | - |
 
 `Prefix + W` opens a picker over every workspace. In practice it duplicates what the sidebar already shows you, with no type-to-search and no extra preview - if you keep the sidebar visible, clicking there or using `Alt+Up/Down` is just as fast. Unlike tmux's `Prefix + w` tree view, it's not clearly pulling its weight.
-
-The sidebar itself can be hidden with `Prefix + B` if you want the full terminal width back. With the sidebar visible, click to switch and right-click to rename a workspace - rename is rare enough that reaching for the mouse once in a while is no hardship, so `Rename workspace` and the workspace picker are both mostly optional.
 
 ## Level 3: Panes
 
 Splits work the same way they do in tmux:
 
-| Action | Binding |
-|--------|---------|
-| Split vertically | `Prefix + V` |
-| Split horizontally | `Prefix + Minus` |
-| Kill pane | `Prefix + X` |
-| Switch pane | `Prefix + arrow keys` |
-| Cycle panes | `Prefix + Tab` / `Prefix + Shift+Tab` |
-| Zoom pane | `Prefix + Z` |
-| Resize mode | `Prefix + R` |
+| Action | Binding | Mouse alternative |
+|--------|---------|--------------------|
+| Split vertically | `Prefix + V` | Right-click the pane |
+| Split horizontally | `Prefix + Minus` | Right-click the pane |
+| Kill pane | `Prefix + X` | Right-click the pane (rare - use this) |
+| Switch pane | `Prefix + arrow keys` | Click the pane |
+| Cycle panes | `Prefix + Tab` / `Prefix + Shift+Tab` | Click the pane |
+| Zoom pane | `Prefix + Z` | Right-click the pane |
+| Resize mode | `Prefix + R` | Drag the pane border (rare - use this) |
+| Rename pane | `Prefix + Shift+P` | Right-click the pane (rare - use this) |
+
+Right-click a pane once for a menu bundling rename, split, zoom, and close, rather than four separate gestures to remember.
 
 ## Level 4: Scrollback
 
