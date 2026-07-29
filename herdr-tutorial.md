@@ -18,6 +18,8 @@ For an existing tmux user, the switch can be almost frictionless. Herdr does not
 
 ## Setting Up config.toml
 
+My config is entirely optional. If you prefer to navigate mostly with the mouse, start with Herdr's defaults. The custom config both preserves my tmux muscle memory and adds ergonomic choices that I prefer, most notably prefix-free `Alt+Arrow` navigation and a comfortable `Ctrl+Space` prefix.
+
 Grab my config and drop it in as `~/.config/herdr/config.toml`, mirroring the way `~/dotfiles/tmux.conf` is linked as `~/.tmux.conf`:
 
 ```bash
