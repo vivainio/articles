@@ -2,15 +2,19 @@
 
 *2026-07-28*
 
-Herdr is a terminal workspace manager built specifically for running AI coding agents. It borrows the tmux mental model - sessions, windows, panes - but is agent-aware: it tracks each pane's state (working, idle, waiting on you), lets you jump straight to the agent that needs attention, and layers on Git worktrees and plugins so an agent-heavy workflow doesn't feel bolted onto a generic multiplexer.
+Herdr is a terminal multiplexer and workspace manager that treats AI coding agents as first-class terminal applications. It borrows the tmux mental model - sessions, windows, panes - and works with ordinary shells and terminal programs, while adding agent state tracking, Git worktrees, and plugins for workflows that need them.
 
 This tutorial is based on my custom [herdr config.toml](https://github.com/vivainio/dotfiles/blob/master/herdr/config.toml), which mirrors my [tmux.conf](https://github.com/vivainio/dotfiles/blob/master/tmux.conf) as closely as Herdr allows - same prefix, same tab/pane bindings - so muscle memory carries over between the two.
 
 ## Why Herdr?
 
-Tmux multiplexes terminals. Herdr multiplexes *agents*. When you're running several Claude Code (or Codex, Gemini, etc.) instances across different projects, the thing you actually want to know at a glance is "which of these is stuck waiting for me?" - not just "which panes exist." Herdr's sidebar answers that directly, and its worktree integration means spinning up a new agent on a new branch is a single keystroke instead of a manual `git worktree add` dance.
+At its core, Herdr does the familiar multiplexer job: it keeps shells and terminal programs organized into persistent workspaces, tabs, and panes. You can detach, reconnect, split the screen, and use it for ordinary terminal work without running an agent at all.
 
 Herdr is also unusually mouse-friendly for a terminal workspace manager, which makes it easier to learn than many alternatives. Most everyday operations - switching workspaces and panes, resizing, splitting, renaming, zooming, and closing - are available through clicks, dragging, and context menus. You can become productive before learning the keybindings, then adopt shortcuts gradually.
+
+Agent awareness is the specialization on top. When you do run several Claude Code, Codex, Gemini, or other agents, the sidebar shows which are working, idle, or waiting for you. Worktree integration can create a separate checkout and workspace for another branch in one action. These features improve agent-heavy workflows without redefining Herdr's basic job as a terminal multiplexer.
+
+For an existing tmux user, the switch can be almost frictionless. Herdr does not read `tmux.conf`, but you can assign your familiar prefix and navigation, tab, split, resize, and workspace bindings to their Herdr equivalents. The underlying model and everyday gestures remain close enough that most muscle memory carries over. The major addition is the extremely useful left sidebar, which keeps workspaces and agent states visible instead of making you recall or open a separate session list, and lets you jump between them directly with the mouse.
 
 ## Setting Up config.toml
 
