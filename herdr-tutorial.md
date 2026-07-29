@@ -32,6 +32,8 @@ The popups and plugin actions below call out to `lazygit`, `lf`, and the `herdr-
 
 Like the tmux config, the default prefix is replaced with `Ctrl+Space`. Since both configs share the same prefix and the same tab/workspace/pane bindings, you can hop between a tmux session and a Herdr session without your fingers noticing the difference.
 
+The two changes that matter most in my tmux config compared with the defaults are this `Ctrl+Space` prefix and prefix-free `Alt+Arrow` navigation. Mirroring those in Herdr preserves most of the muscle memory; the remaining bindings are much closer to what either multiplexer already provides.
+
 ## Level 1: Tabs
 
 Herdr calls tabs "tabs" (tmux calls them "windows" - same thing):
@@ -40,14 +42,14 @@ Herdr calls tabs "tabs" (tmux calls them "windows" - same thing):
 |--------|---------|--------------------|
 | Create new tab | `Prefix + c` | Click the `+` button in the tab bar |
 | Close current tab | `Prefix + k` | - |
-| Rename tab | `Prefix + Shift+T` | Right-click the tab (rare - use this) |
+| Rename tab | `Prefix + Shift+T` | Right-click the tab, then choose **Rename** |
 | Next tab | `Alt+Right` | Click the tab |
 | Previous tab | `Alt+Left` | Click the tab |
 | Jump to tab N | `Prefix + 1..9` | Click the tab |
 
 No prefix needed for navigation - just hold Alt and press arrow keys, exactly like the tmux config.
 
-Herdr captures the mouse by default (`ui.mouse_capture = true`). Note double-click does nothing here - it's right-click that renames, which is easy to get backwards if you're used to other apps.
+Herdr captures the mouse by default (`ui.mouse_capture = true`). Right-click opens the tab's context menu; choose **Rename** from there. Double-click does nothing, which is easy to get backwards if you're used to other apps.
 
 ## Level 2: Workspaces
 
@@ -62,14 +64,14 @@ Confusingly, Herdr also has a literal "session" concept (`herdr --session <name>
 | Previous workspace | `Alt+Up` | Click it in the sidebar |
 | Workspace picker | `Prefix + W` | Sidebar already shows this - see below |
 | Goto (session navigator) | `Prefix + G` | - |
-| Rename workspace | `Prefix + Shift+W` | Right-click it in the sidebar (rare - use this) |
+| Rename workspace | `Prefix + Shift+W` | Right-click it in the sidebar, then choose **Rename** |
 | Close workspace | `Prefix + Shift+K` | - |
 | Detach | `Prefix + Q` | - |
 | Toggle sidebar | `Prefix + B` | - |
 
 `Prefix + W` opens a picker over every workspace. In practice it duplicates what the sidebar already shows you, with no type-to-search and no extra preview - if you keep the sidebar visible, clicking there or using `Alt+Up/Down` is just as fast.
 
-`Prefix + G` is the one that's actually equivalent to tmux's `Prefix + w` tree view: it shows workspaces and their panes together, not just a flat workspace list, so it's the better pick when you want to jump straight into a specific pane rather than just a workspace.
+`Prefix + G` is the one that's actually equivalent to tmux's `Prefix + w` tree view: it shows workspaces and their panes together, not just a flat workspace list, so it's the better pick when you want to jump straight into a specific pane rather than just a workspace. Press `/` inside the Goto dialog to search and filter the list.
 
 ## Level 3: Panes
 
@@ -77,14 +79,14 @@ Splits work the same way they do in tmux:
 
 | Action | Binding | Mouse alternative |
 |--------|---------|--------------------|
-| Split vertically | `Prefix + V` | Right-click the pane |
-| Split horizontally | `Prefix + Minus` | Right-click the pane |
-| Kill pane | `Prefix + X` | Right-click the pane (rare - use this) |
+| Split vertically | `Prefix + V` | Right-click the pane, then choose the split |
+| Split horizontally | `Prefix + Minus` | Right-click the pane, then choose the split |
+| Kill pane | `Prefix + X` | Right-click the pane, then choose **Close** |
 | Switch pane | `Prefix + arrow keys` | Click the pane |
 | Cycle panes | `Prefix + Tab` / `Prefix + Shift+Tab` | Click the pane |
-| Zoom pane | `Prefix + Z` | Right-click the pane |
+| Zoom pane | `Prefix + Z` | Right-click the pane, then choose **Zoom** |
 | Resize mode | `Prefix + R` | Drag the pane border (rare - use this) |
-| Rename pane | `Prefix + Shift+P` | Right-click the pane (rare - use this) |
+| Rename pane | `Prefix + Shift+P` | Right-click the pane, then choose **Rename** |
 
 Right-click a pane once for a menu bundling rename, split, zoom, and close, rather than four separate gestures to remember.
 
