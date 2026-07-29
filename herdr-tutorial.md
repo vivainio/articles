@@ -223,6 +223,23 @@ A `[[panes]]` command can be a long-running TUI or service. It follows the same 
 
 After a normal server restart, Herdr restores the saved workspace and pane layout, not arbitrary processes that previously ran inside it. A plugin can declare a one-shot `[[startup]]` hook to reconstruct plugin-owned state after restore when the API is ready, but startup hooks should not be treated as a supervised daemon facility. Native agent session restore is a separate mechanism for supported coding agents and does not automatically restore arbitrary plugin processes.
 
+### Compared with tmux and Zellij
+
+Herdr is not the only terminal multiplexer with hooks or plugins, but the three systems make different tradeoffs:
+
+| | tmux | Zellij | Herdr |
+|---|---|---|---|
+| Plugin model | Shell scripts and configuration, often installed with TPM | First-class WASM/WASI modules hosted by Zellij | Manifest plus out-of-process executables |
+| Implementation | Anything callable from a shell | Languages that compile to WebAssembly | Any executable or script |
+| User interface | Usually status-line changes, keybindings, popups, or normal panes | Plugins render native UI and act as first-class panes | Programs run in Herdr-managed terminal panes |
+| Events | tmux hooks invoke commands or scripts | Persistent plugins subscribe to a rich event stream | Manifest hooks launch commands; socket clients can subscribe continuously |
+| Security | Scripts run with the user's normal permissions | WASM isolation with explicit requested permissions | Executables run with the user's normal permissions; GitHub installation shows a trust preview |
+| Emphasis | General terminal automation | General terminal UI extensions | Agent-, workspace-, and worktree-oriented workflows |
+
+Herdr resembles tmux in building on ordinary external programs, but formalizes their packaging, actions, panes, and event hooks in a manifest. Zellij has the deeper native plugin runtime, including persistent components, rendered UI, subscriptions, and permissions, but requiring WebAssembly is also a meaningful constraint: languages and libraries must support WASM/WASI, OS and subprocess access goes through Zellij's APIs and permissions, and an existing TUI or CLI cannot simply be packaged unchanged as a native plugin.
+
+Herdr makes the opposite tradeoff. An existing shell script, binary, or terminal application can become a plugin without being ported to a specialized runtime - Reviewr remains a normal Rust TUI executable, for example. Herdr gives up Zellij's WASM isolation and native rendered UI in exchange for compatibility with the existing Unix and terminal ecosystem. Its advantage is lower implementation friction and agent-specific context, not a more powerful general plugin system than Zellij.
+
 ## Q&A
 
 **Why not just use tmux?**
