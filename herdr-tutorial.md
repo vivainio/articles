@@ -116,7 +116,11 @@ herdr agent wait <id> --state idle  # block until an agent needs you
 herdr agent prompt <id> "..."      # submit a prompt without focusing it
 ```
 
-Worktrees take this further: `Prefix + Shift+G` creates a new Git worktree-backed workspace, so kicking off a second agent on a separate branch doesn't mean juggling a manual `git worktree add` and a new terminal - it's one keystroke, and the workspace is already checked out and ready.
+Worktrees take this further: `Prefix + Shift+G` creates a new Git worktree-backed workspace, so kicking off a second agent on a separate branch doesn't mean juggling a manual `git worktree add` and a new terminal - it's one keystroke, and the workspace is already checked out and ready. Worktree-backed workspaces appear in the workspace pane alongside your other workspaces, so their relationship to the running agents stays visible. When you're finished, right-click the workspace and choose **Delete** to remove the worktree checkout without dropping back to the command line.
+
+Herdr generates a random branch name for each new worktree, such as `worktree/calm-forest-c059`, and checks it out below `~/.herdr/worktrees/<repository>/`, for example `~/.herdr/worktrees/articles/worktree-calm-forest-c059`.
+
+> **Claude Code note:** Claude Code also offers its own worktree management, especially when using its agents mode. That is a separate mechanism from Herdr-managed worktrees, so Herdr's worktree layout and lifecycle may not integrate as closely with workflows that expect Claude Code to create and manage the checkouts itself.
 
 ```bash
 herdr worktree list
@@ -126,16 +130,98 @@ herdr worktree remove <path>
 
 ## Level 7: Plugins
 
-Herdr plugins are a standardized way to package and install Herdr-focused tools. They are not uniquely privileged: a normal app or script can also invoke the `herdr` CLI to query workspaces and agents or perform actions. The practical benefits of a plugin are standardized installation, packaged named actions, and convenient keybinding through `type = "plugin_action"`.
+Herdr plugins are executable workflow tools packaged around a `herdr-plugin.toml` manifest. A normal app or script can invoke the `herdr` CLI too, so plugins do not get an entirely separate control API. What the plugin system adds is standardized installation, named actions, managed panes, convenient keybindings, and declarative hooks into Herdr's lifecycle.
 
 My config uses two:
 
 - **[herdr-file-viewer](https://github.com/smarzban/herdr-file-viewer)** - a git-aware, read-only file viewer as a TUI split pane, bound to `Prefix + F` (split) and `Prefix + Shift+F` (own tab).
 - **reviewr** - review agent-written diffs beside the chat and add line comments back into the agent's input, toggled with `Prefix + Ctrl+R`.
 
-Plugins are installed with `herdr plugin install <owner>/<repo>` and bound via `type = "plugin_action"` or a `herdr plugin action invoke` shell command in `config.toml`, the same way the popups above are bound.
+### Install and invoke a plugin
 
-There is no lifecycle advantage documented here: unless Herdr provides initialization, cleanup, supervision, or workspace-specific start/stop hooks, a plugin has no special lifecycle capability compared with a normal CLI app.
+Install a plugin directly from GitHub:
+
+```bash
+herdr plugin install <owner>/<repo>
+herdr plugin list
+```
+
+A manifest can expose `[[actions]]`, which are commands Herdr runs with the current pane or workspace context. They can be invoked from the CLI or bound directly in `config.toml`:
+
+```toml
+[[keys.command]]
+key = "prefix+ctrl+r"
+type = "plugin_action"
+command = "persiyanov.reviewr.toggle"
+```
+
+The command is `<plugin-id>.<action-id>`. Reviewr declares that action like this:
+
+```toml
+[[actions]]
+id = "toggle"
+title = "reviewr: toggle sidebar"
+contexts = ["pane", "workspace"]
+command = ["bash", "herdr/sidebar.sh", "toggle"]
+```
+
+Here, `toggle` is an ordinary argument to Reviewr's script, selecting its toggle behavior; it is not special Herdr syntax.
+
+### Plugin panes
+
+A plugin can declare a terminal UI as a managed pane entrypoint. Herdr controls where the pane is placed and supplies the plugin environment when it launches the command:
+
+```toml
+[[panes]]
+id = "sidebar"
+title = "reviewr"
+placement = "split"
+command = ["sh", "-c", "exec \"$HERDR_PLUGIN_ROOT/bin/herdr-reviewr\""]
+```
+
+Actions and event hooks can then open or close that entrypoint through `herdr plugin pane`. This is how a tool such as Reviewr can live beside an agent instead of behaving like an unrelated popup process.
+
+### Lifecycle event hooks
+
+An `[[events]]` entry tells Herdr to run a command whenever a matching lifecycle event occurs. For example, Reviewr automatically opens its review pane when Herdr creates a new worktree-backed workspace, provided Reviewr's `auto_open` setting is enabled:
+
+```toml
+# Auto-open the sidebar for a freshly created worktree.
+[[events]]
+on = "worktree.created"
+command = ["bash", "herdr/sidebar.sh", "auto-open"]
+```
+
+`auto-open` is Reviewr's event-specific script mode. Unlike a manual `open`, it reads the newly created workspace and checkout path from the event payload, respects the `auto_open` setting, avoids stealing focus, and quietly does nothing when opening would be inappropriate or the pane already exists.
+
+Plugin manifests can subscribe to these events:
+
+| Area | Events |
+|------|--------|
+| Workspace | `workspace.created`, `workspace.updated`, `workspace.closed`, `workspace.renamed`, `workspace.moved`, `workspace.focused` |
+| Worktree | `worktree.created`, `worktree.opened`, `worktree.removed` |
+| Tab | `tab.created`, `tab.closed`, `tab.renamed`, `tab.moved`, `tab.focused` |
+| Pane | `pane.created`, `pane.closed`, `pane.focused`, `pane.moved`, `pane.exited`, `pane.agent_detected`, `pane.agent_status_changed` |
+
+Event commands receive the event name in `HERDR_PLUGIN_EVENT` and its full JSON envelope in `HERDR_PLUGIN_EVENT_JSON`. Herdr also supplies plugin paths and whatever workspace, tab, and pane context is available. That lets one script handle several events or inspect details such as the created worktree, closed pane, or new agent state.
+
+High-volume and display-only events such as `pane.output_changed`, `pane.updated`, `layout.updated`, and `workspace.metadata_updated` are deliberately not available as manifest hooks. Tools that need those use Herdr's socket event-subscription API instead.
+
+Lifecycle hooks are the clearest capability plugins add over a normal launched app: Herdr invokes the tool at the relevant moment without the tool polling for changes. A standalone app could reproduce the behavior with its own event subscriber or glue code, but merely calling the CLI does not give it a declarative subscription.
+
+### Long-running plugin processes
+
+A `[[panes]]` command can be a long-running TUI or service. It follows the same lifetime rules as any other process running in a Herdr pane:
+
+| Action | What happens to the process |
+|--------|-----------------------------|
+| Detach with `Prefix + Q` or close the terminal client | Keeps running in the background Herdr server |
+| Close its pane or workspace | Terminates |
+| Stop or normally restart the Herdr server | Terminates |
+| Force-kill or crash the server | Must not be expected to survive |
+| Replace the server with a successful experimental live handoff | May keep running |
+
+After a normal server restart, Herdr restores the saved workspace and pane layout, not arbitrary processes that previously ran inside it. A plugin can declare a one-shot `[[startup]]` hook to reconstruct plugin-owned state after restore when the API is ready, but startup hooks should not be treated as a supervised daemon facility. Native agent session restore is a separate mechanism for supported coding agents and does not automatically restore arbitrary plugin processes.
 
 ## Q&A
 
