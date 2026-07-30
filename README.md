@@ -3,6 +3,8 @@
 Practical writing about software, tools, AI agents, terminals, infrastructure,
 and whatever proves interesting next.
 
+**Read online:** [vivainio.github.io/articles](https://vivainio.github.io/articles/)
+
 The published site is built with [Zensical](https://zensical.org/). Article
 sources live under [`docs/`](docs/).
 
