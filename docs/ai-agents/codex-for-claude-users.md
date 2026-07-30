@@ -2,6 +2,11 @@
 
 *2026-07-24*
 
+!!! note "Work in progress"
+
+    This article is published as a draft. The practical comparison at the end
+    still needs observations from longer-term use of both tools.
+
 If you already use Claude Code, Codex feels familiar within a few minutes: start it in a repository, describe what you want, review what it changes, and keep steering until the job is done. The interesting differences are not in the basic chat loop. They are in how Codex organizes configuration, reusable workflows, permissions, and long-running work.
 
 This guide covers the differences that matter when moving between the two.

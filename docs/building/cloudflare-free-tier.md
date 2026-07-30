@@ -187,3 +187,12 @@ The CLI itself is a separate PyPI package (`pip install push-to-outpost`), so th
 ## Where it stops being free
 
 None of this is a permanent free lunch if a project takes off - Workers Paid starts at $5/month and buys you 10M requests, 30s CPU time, and proportionally higher everything-else. But for the actual shape of a vibe-coding session - "build a small tool, use it yourself or with a few people, iterate fast" - the free tier isn't a crippled trial. It's the whole stack, forever, until you have a real reason to pay.
+
+## Related writing
+
+- [Packaging Rust CLI Apps to PyPI](packaging-rust-to-pypi.md) covers the other
+  side of shipping a tool: putting its local CLI into a familiar package
+  ecosystem.
+- [A Tiny HTTP Server with Just the Python Standard Library](python-stdlib-webserver/index.md)
+  takes the same small-system instinct in the opposite direction—local,
+  dependency-free simulators and fakes.

@@ -13,7 +13,7 @@
 - [Comparison](#comparison) — source lines, output transparency, build deps
 - [How it works](#how-it-works) — object merging and custom abstractions
 - [Replacing SAM with sam.libsonnet](#replacing-sam-with-samlibsonnet) — SAM-shaped input, plain CFN output
-- [Beyond serverless](#beyond-serverless--greenfield-cloudformation) — resource factories, policy libraries, config-driven stacks
+- [Beyond serverless](#beyond-serverless-greenfield-cloudformation) — resource factories, policy libraries, config-driven stacks
 - [Targeting SAM output](#targeting-sam-output) — when to let SAM do the expansion
 - [Trade-offs](#trade-offs) — what you gain and lose
 - [Getting started](#getting-started)
@@ -820,3 +820,11 @@ it before confirming.
 **AI-authored content.** All prose, library code, and examples in this
 repository were authored by Claude Opus 4.6 and reviewed by a (presumed)
 human.
+
+## Related writing
+
+- [What Cloudflare's Free Tier Gives Vibe Coders](../../building/cloudflare-free-tier.md)
+  looks at a much smaller cloud stack where the deployment model is part of the
+  appeal.
+- [My Vibing Flow](../../ai-agents/my-vibing-flow.md) describes the
+  agent-assisted working style behind experiments like this one.

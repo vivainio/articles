@@ -1,13 +1,30 @@
-# Articles
+# Ville's Field Notes
 
-A collection of articles and writings.
+Practical writing about software, tools, AI agents, terminals, infrastructure,
+and whatever proves interesting next.
 
-## Contents
+The published site is built with [Zensical](https://zensical.org/). Article
+sources live under [`docs/`](docs/).
 
-- [Tmux Tutorial](tmux-tutorial.md) - Getting started with tmux
-- [Herdr Tutorial](herdr-tutorial.md) - Getting started with Herdr, a terminal workspace manager for AI coding agents
-- [My Vibing Flow](my-vibing-flow.md) - How I use Claude Code in WSL
-- [Ejecting Serverless with Jsonnet](jsonnet-cloudformation/README.md) - Replacing Serverless Framework and SAM with plain Jsonnet + CloudFormation
-- [A Tiny HTTP Server with Just the Python Standard Library](python-stdlib-webserver/README.md) - Route decorators on top of `http.server` for simulators and fakes
-- [Packaging Rust CLI Apps to PyPI](packaging-rust-apps-to-pypi.md) - Ship Rust binaries via `pip install` using maturin's `bindings = "bin"`, no FFI required
-- [What Cloudflare's Free Tier Gives Vibe Coders](cloudflare-free-tier-for-vibe-coders.md) - Pages, Workers, D1, R2, KV, Durable Objects, Workers AI, and free auth via Access - what's actually free, from shipping tmux-tower
+## Preview locally
+
+```bash
+pip install zensical
+zensical serve
+```
+
+Zensical prints the local preview URL. The production site is deployed to
+GitHub Pages whenever `main` is updated.
+
+## Writing
+
+The collection is intentionally broader than a single subject. Current shelves
+include:
+
+- AI & coding agents
+- Terminal craft
+- Building & shipping
+- Infrastructure experiments
+
+New pieces should go where they fit; a new shelf is preferable to forcing an
+article under an existing theme.

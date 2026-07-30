@@ -94,3 +94,11 @@ No Python code does this; it falls out of how the packaging tools already work.
 So: a ~10-line `pyproject.toml`, two stock actions, and your binaries on GitHub
 Releases keep working unchanged — while everyone who thinks in `pip`/`uv` gets a
 one-liner.
+
+## Related writing
+
+- [What Cloudflare's Free Tier Gives Vibe Coders](cloudflare-free-tier.md)
+  follows a similarly pragmatic path from a small tool to something people can
+  install and use.
+- [A Tiny HTTP Server with Just the Python Standard Library](python-stdlib-webserver/index.md)
+  is another example of choosing the smallest useful implementation.

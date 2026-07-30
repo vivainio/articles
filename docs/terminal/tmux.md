@@ -133,3 +133,10 @@ Tmux is more mature and a much smaller application. It's not written in Rust (ye
 **Seriously, why??**
 
 With the advent of AI, there is growing ability to multitask. Multitasking is made much easier if you have full sessions that contain the context for one task, and can easily hop to other sessions with next steps waiting for you. In IDEs it's easy to get lost among windows and blinking lights, while terminal sessions stay very focused on an individual task.
+
+## Related writing
+
+- [Herdr Tutorial](herdr.md) applies a similar workspace model to a
+  multiplexer designed around coding agents.
+- [My Vibing Flow](../ai-agents/my-vibing-flow.md) shows this tmux setup as part
+  of a complete development workflow.

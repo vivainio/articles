@@ -257,3 +257,10 @@ Tmux is more mature and doesn't care what's running in its panes. Herdr trades t
 **Can I use both?**
 
 Yes - the two configs here are deliberately kept in sync on prefix and core bindings, so you can run Herdr for agent-heavy projects and tmux for everything else without relearning muscle memory.
+
+## Related writing
+
+- [Tmux Tutorial](tmux.md) covers the mature, general-purpose alternative whose
+  mental model and keybindings shaped this setup.
+- [My Vibing Flow](../ai-agents/my-vibing-flow.md) shows how persistent terminal
+  workspaces fit into daily agent-assisted development.

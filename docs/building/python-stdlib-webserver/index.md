@@ -181,3 +181,12 @@ Now handlers can write `return 404, {"error": "no such user"}` when they want a 
 The `serve()` helper above uses `ThreadingHTTPServer` so parallel client requests don't block each other — one thread per request. If you'd rather have strict single-threaded behaviour (easier debugging, no concurrency surprises), swap it for `HTTPServer`. Either way, don't share mutable state across handlers without a lock.
 
 For the case where you just need to answer a few HTTP requests with canned data, the standard library has had you covered since Python 2. It just needed a tiny bit of sugar on top.
+
+## Related writing
+
+- [Packaging Rust CLI Apps to PyPI](../packaging-rust-to-pypi.md) uses Python's
+  ecosystem as a distribution channel without turning the program into a
+  Python application.
+- [What Cloudflare's Free Tier Gives Vibe Coders](../cloudflare-free-tier.md)
+  covers the other end of the spectrum: deploying a small application as a
+  public cloud service.

@@ -6,7 +6,7 @@ This is how I use Claude Code in WSL to get things done.
 
 ## Tmux First
 
-The first thing I do after entering bash is start [tmux](tmux-tutorial.md). Everything happens inside tmux sessions from there.
+The first thing I do after entering bash is start [tmux](../terminal/tmux.md). Everything happens inside tmux sessions from there.
 
 ## Starting a Project Session
 
@@ -19,7 +19,7 @@ From there, I open new tabs to run commands in the project directory. For quick 
 - `Prefix + Ctrl+G` - [lazygit](https://github.com/jesseduffield/lazygit) to review diffs
 - `Prefix + Ctrl+L` - [lf](https://github.com/gokcehan/lf) file manager to browse files
 
-These float over the current tab and disappear when done. See [my tmux tutorial](tmux-tutorial.md) for the full setup.
+These float over the current tab and disappear when done. See [my tmux tutorial](../terminal/tmux.md) for the full setup.
 
 Often while working in one session, I'll branch off to start a new session with `wss` in another directory - maybe to fix something I noticed, or to work on a dependency. Switching between sessions is instant with `Alt+Up/Down`.
 
@@ -38,3 +38,12 @@ tmux-workspace "my-project" [
 ```
 
 This creates a session with five tabs, each in the right directory and running its command. Claude is on tab 1, backend services on the next tabs, and frontend dev servers last.
+
+## Related writing
+
+- [Tmux Tutorial](../terminal/tmux.md) goes through the configuration behind
+  this workflow.
+- [Herdr Tutorial](../terminal/herdr.md) explores a more agent-aware version of
+  the same terminal workspace model.
+- [Codex for Claude Code Users](codex-for-claude-users.md) compares the agent
+  configuration and permission models.
