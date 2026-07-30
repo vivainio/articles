@@ -47,16 +47,11 @@ leaves you on your own for everything else.
 
 AWS CDK is popular but carries real costs. Even if you write your
 infrastructure in Python or C#, CDK's core runs on Node.js — you still need a
-Node runtime, `node_modules`, and the full tree of npm dependencies in every
-project and CI pipeline. `cdk synth` runs your code through jsii (the
-cross-language bridge) and Node to emit CloudFormation JSON — on a cold
-`node_modules` this takes 20-60 seconds even for small stacks. If you use
-TypeScript (the most common CDK language), add the compilation step on top —
-`tsc` or `ts-node` adds its own startup overhead to every synth. CI pipelines
-need a Node runtime image, `npx cdk` bootstrapping, and CDK-specific IAM
-permissions. For teams whose Lambda functions are Python or C#, maintaining a
-Node toolchain (plus the Python/C# toolchain you actually chose) solely for
-the deployment layer is overhead that never pays for itself.
+Node runtime and npm dependencies in each development or CI environment that
+synthesizes the application. `cdk synth` runs your code through jsii and Node to
+emit CloudFormation JSON. TypeScript projects also need their TypeScript
+toolchain. For teams whose Lambda functions are Python or C#, that additional
+toolchain may be more machinery than they want in the deployment layer.
 
 CDK also generates CloudFormation with machine-generated logical IDs (hashes
 like `MyFunctionServiceRole3AC7B20E`), deeply nested metadata blocks, and
@@ -65,15 +60,17 @@ Reviewing a `cdk diff` in a pull request means staring at hundreds of lines of
 machine-generated JSON that no human authored — you're trusting the abstraction
 rather than reviewing the infrastructure.
 
-There's also the migration problem: CDK creates its own stacks with its own
-logical IDs. You can't deploy CDK to your existing Serverless/SAM stacks —
-you'd be creating entirely new stacks alongside the old ones, then migrating
-stateful resources (DynamoDB tables, SQS queues, S3 buckets) from the old
-stacks to the new ones. That means `DeletionPolicy: Retain`, manual imports,
-and careful ordering — one mistake and you lose data.
+There's also a migration problem: CDK normally generates logical IDs from its
+construct tree, so they will not automatically match an existing Serverless or
+SAM stack. CDK can target an existing named stack, and CloudFormation supports
+resource import and refactoring workflows, but preserving the identity of every
+existing resource takes explicit work. Moving stateful resources such as
+DynamoDB tables, SQS queues, and S3 buckets may require retention policies,
+imports, and careful ordering.
 
-CDK shines when you're building from scratch with large, complex infrastructure
-— but for migrating existing serverless stacks, it's the wrong tool.
+CDK shines when you're building from scratch with large, complex infrastructure.
+For an in-place migration whose main goal is to preserve an existing generated
+template, it may be a poor fit.
 
 ### What we actually need
 
@@ -84,9 +81,10 @@ The Serverless Framework did two things:
 2. **Deploy orchestration** — packaging code, uploading to S3, calling
    `cloudformation deploy`.
 
-Item 2 is a shell script. The real value was always item 1. The question
-is: can we get the same boilerplate reduction without a framework, without a
-transform, and without a Node.js build step?
+Item 2 can be replaced by a deployment script, but that script then owns
+artifact hashing and uploads, change-set handling, failure behavior, and
+credentials. The question here is narrower: can we get the same boilerplate
+reduction without a framework, a transform, or a Node.js build step?
 
 ### Jsonnet
 
@@ -99,18 +97,17 @@ instant. Jsonnet is already widely used for generating Kubernetes manifests
 JSON/YAML configurations is exactly what it was designed for, and
 CloudFormation is the same kind of problem. The official
 [tutorial](https://jsonnet.org/learning/tutorial.html) is a good starting
-point for learning the language, though you may want to skip it if you're a
-recovering alcoholic — the reasons will become clear once you visit.
+point for learning the language.
 
-Jsonnet gives you the same power of abstraction as CDK — functions, local
+Jsonnet gives you many of the same abstraction tools as CDK — functions, local
 variables, imports, conditionals, array comprehensions, object merging — but
 everything stays declarative. Declarative here means: data goes in, JSON comes
 out, and nothing else happens. There are no side effects — no file writes, no
 network calls, no mutable state. You define data, not procedures. The output of
-a Jsonnet file *is* the template, not a side effect of running a program. And unlike CDK, there is no `node_modules` directory, no transitive
-dependency tree, and no 20-60 second `cdk synth` step. The Jsonnet binary is a
-single ~2 MB executable with zero runtime dependencies, and it compiles
-templates in milliseconds — fast enough that you never notice it.
+a Jsonnet file *is* the template, not a side effect of running a program. Unlike
+CDK, there is no `node_modules` directory, transitive dependency tree, or
+`cdk synth` step. The Jsonnet binary is a small executable with no runtime
+dependencies, and these templates compile in milliseconds.
 
 The approach: write a Jsonnet library where each helper returns a flat object
 of CloudFormation resources. Merge them with `+`. Run `jsonnet` to emit plain
@@ -125,9 +122,10 @@ JSON template to CloudFormation, and that template is still sitting in your
 deployment bucket or in the CloudFormation console under the stack's Template
 tab.
 
-The migration is mechanical — and mechanical work is exactly what AI coding
-agents excel at. A tool like Claude Code can read your existing CloudFormation
-JSON, factor it into library calls, and verify the output matches the original.
+Much of the migration is structural, which makes it a reasonable job for an AI
+coding agent with human review. A tool like Claude Code can read your existing
+CloudFormation JSON, factor it into library calls, and help verify the output
+against the original.
 This repository includes a sample Claude Code skill for this workflow:
 [`skills/exit-serverless-to-jsonnet/SKILL.md`](skills/exit-serverless-to-jsonnet/SKILL.md).
 
@@ -149,20 +147,22 @@ The steps:
    `sls.corsOptions(...)`. Service-specific resources (DynamoDB tables, custom
    IAM statements) stay as inline Jsonnet objects.
 
-4. **Verify** by diffing the Jsonnet output against the captured original:
-   `diff <(jsonnet my-service.jsonnet) captured-original.json`. The resource
-   structure should match — key names, types, properties. Minor differences
-   in JSON key ordering are expected (Jsonnet [sorts alphabetically](#caveats)).
+4. **Verify** by comparing canonical JSON rather than raw text:
+   `diff <(jsonnet my-service.jsonnet | jq -S .) <(jq -S . captured-original.json)`.
+   The resource structure should match — key names, types, and properties.
 
-5. **Deploy** the Jsonnet-generated template to the *existing* stack.
-   CloudFormation computes a changeset against the current state. If the
-   logical IDs and resource properties match, the changeset is empty — a
-   no-op deploy that confirms the migration is correct.
+5. **Create, inspect, and only then execute** a change set against the existing
+   stack. One way is `aws cloudformation deploy --no-execute-changeset ...`,
+   followed by `aws cloudformation describe-change-set --stack-name <stack>
+   --change-set-name <name>` using the change-set name returned by `deploy`. If
+   the logical IDs and resource properties match, the change set should be
+   empty. Do not let the first comparison execute automatically.
 
-This is a low-risk migration: you're replacing the *source* of the template,
-not the deployed infrastructure. The stack, the Lambda functions, the API
-Gateway — everything stays in place. CloudFormation only acts on differences,
-and if there are none, nothing changes.
+The aim is to replace the *source* of the template without replacing the
+deployed infrastructure. That can reduce migration risk, but only if the
+generated logical IDs and properties really match. CloudFormation acts on every
+difference, so the reviewed change set—not the source-level resemblance—is the
+safety boundary.
 
 This matters because moving resources between CloudFormation stacks is painful.
 If a stack owns a DynamoDB table or an SQS queue, you can't just declare it in
@@ -175,9 +175,11 @@ logical ID, which CloudFormation interprets as "delete the old resource and
 create a new one." The safest path is to keep your existing stacks and change
 only how the template is generated — which is exactly what this approach does.
 
-The same approach works for SAM templates: run `sam build` to get the expanded
-CloudFormation, then factor it into `sam.libsonnet` calls that produce the
-same output.
+The same general approach can be used for SAM templates, but `sam build` does
+not expand the SAM transform into its final raw resources. To compare against
+the processed CloudFormation, retrieve the deployed stack template with
+`aws cloudformation get-template --template-stage Processed`, then factor that
+output into `sam.libsonnet` calls.
 
 ## The boilerplate problem
 
@@ -204,8 +206,10 @@ This 7-line declaration expands to ~120 lines of CloudFormation JSON:
 - `AWS::IAM::Role` — execution role with log permissions
 - `AWS::S3::Bucket` + `BucketPolicy` — deployment artifact storage
 
-The same is true for SAM's `AWS::Serverless::Function` — the SAM transform
-expands it to the same set of resources at deploy time.
+SAM's `AWS::Serverless::Function` also expands into ordinary CloudFormation, but
+the exact resources depend on its properties and events. A Lambda function is
+always generated; versions, aliases, roles, permissions, and event resources
+are conditional.
 
 Both approaches hide the generated CloudFormation from you. When something goes
 wrong, you're debugging a template you didn't write.
@@ -337,10 +341,13 @@ Once you manage the template yourself, you can separate the two concerns:
    my-service-dev-worker --zip-file fileb://package.zip` — no CloudFormation
    involved, completes in seconds.
 
-This is faster and simpler for day-to-day development. You don't need to
-maintain S3 keys in your template or manage artifact versioning in a deployment
-bucket. The template's `Code` property becomes a one-time bootstrap value (or
-points to a fixed S3 path that your CI overwrites).
+This can be faster for day-to-day development, but it deliberately creates
+CloudFormation drift: the deployed function code no longer corresponds to the
+artifact named in the stack template. Keep a record of the deployed code
+version and make rollback an explicit part of the code-deployment script. Do
+not merely overwrite an object at a fixed S3 key and expect CloudFormation to
+detect new contents; use content-addressed keys whenever CloudFormation manages
+the code update.
 
 The trade-off: CloudFormation rollbacks won't roll back code changes made
 outside the stack. In practice this rarely matters — if a code deploy breaks
@@ -510,13 +517,12 @@ Every service imports the same file. Account numbers never change, but
 `constants.accounts.prod` is easier to review in a PR than a bare
 12-digit number — and you can't typo it.
 
-Unlike CDK, the abstraction can never get in the way. In CDK, when a construct
-doesn't expose the property you need, you're stuck — you have to use escape
-hatches, cast to `CfnResource`, or fight the type system. In Jsonnet, every
-helper returns a plain object. If a helper doesn't do what you need, you merge
-in a raw CloudFormation block with `+` right next to it — no escape hatch, no
-special API, just data. High-level helpers and low-level resources coexist in
-the same file, in the same `Resources:` object, with the same merge operator.
+The abstraction boundary is relatively thin. CDK constructs that do not expose
+a needed property may require an escape hatch or a lower-level `CfnResource`.
+Here, every helper returns a plain object, so you can merge in a raw
+CloudFormation block with `+` next to it. A poorly designed helper can still be
+confusing or destructive, but high-level helpers and low-level resources use
+the same data model and can coexist in the same `Resources:` object.
 
 CDK also makes reorganization painful: moving a resource from one construct to
 another changes its logical ID (because the construct path is part of the
@@ -536,10 +542,11 @@ expands them to raw CloudFormation through `sls.libsonnet`.
 
 SAM templates are concise. A function with five API routes is about 40 lines.
 But the SAM transform is a black box: you submit a template with
-`AWS::Serverless::Function` and CloudFormation expands it at deploy time. You
-can run `sam build` to preview, but in production you're trusting the
-transform. When something goes wrong, you're debugging resources you didn't
-declare.
+`AWS::Serverless::Function` and CloudFormation expands it at deploy time.
+`sam build` prepares artifacts and a build template, but does not show the final
+raw resources produced by the transform. You can retrieve a deployed stack's
+processed template from CloudFormation; until then, failures can involve
+resources you did not declare directly.
 
 SAM also doesn't support custom abstractions — there's no way to define
 reusable patterns like the company-wide log forwarding mixin shown earlier.
@@ -813,9 +820,10 @@ for upstream after more usage.
 **Not yet battle-tested.** This approach has not been used for any production
 serverless stack yet. The library and examples are functional but unproven at
 scale. Any loss of resources or data resulting from deploying these templates is
-your responsibility. Always review the CloudFormation changeset before deploying
-— `aws cloudformation deploy` shows the diff, and you should read every line of
-it before confirming.
+your responsibility. Create the change set without executing it—for example
+with `aws cloudformation deploy --no-execute-changeset`—inspect it with
+`aws cloudformation describe-change-set --stack-name <stack>
+--change-set-name <name>`, and execute it separately only after review.
 
 **AI-authored content.** All prose, library code, and examples in this
 repository were authored by Claude Opus 4.6 and reviewed by a (presumed)

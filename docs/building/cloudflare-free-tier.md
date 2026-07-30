@@ -6,7 +6,7 @@ I built and shipped outpost - a small web app that lets me peek at my tmux sessi
 
 ## Why Cloudflare specifically
 
-For a vibe-coding session with Claude Code, the pitch is: you describe an app, get static hosting + a backend + a database + auth, and none of it costs anything until you have real traffic. Cloudflare's free tier is unusually generous compared to AWS/GCP/Azure free tiers, which tend to be time-limited (12 months) or nickel-and-dime you on egress. Cloudflare's free tier is *forever free*, and egress is free everywhere - that matters a lot once you start storing anything in R2 or D1.
+For a vibe-coding session with Claude Code, the pitch is: you describe an app, get static hosting + a backend + a database + auth, and none of it costs anything until you have real traffic. Cloudflare's free tier is unusually generous compared to many AWS/GCP/Azure introductory offers, which may be time-limited or charge separately for data transfer. Cloudflare does not charge ordinary data-transfer fees for Workers, D1, or R2, which matters once you start storing anything.
 
 ## The pieces
 
@@ -14,7 +14,8 @@ For a vibe-coding session with Claude Code, the pitch is: you describe an app, g
 
 [Workers](https://developers.cloudflare.com/workers/) can serve a whole static site directly - point a `[assets]` block in `wrangler.toml` at a directory and `wrangler deploy` ships both the static files and your API code as one Worker. Free plan:
 
-- 100,000 requests/day (assets and Worker code share this)
+- Static asset requests are free and unlimited; requests that invoke Worker code
+  count toward the Workers allowance of 100,000/day
 - 100 custom domains per account
 - 25 MiB per static file
 - No separate build/deploy step for assets - they're just uploaded alongside the Worker
@@ -41,7 +42,7 @@ async function getSessions(env: Env): Promise<Response> {
 }
 ```
 
-`Env` isn't hand-written - `npx wrangler types` reads your `wrangler.toml` bindings (including the `[assets]` block) and generates a `worker-configuration.d.ts` with a matching `Env` interface (`TOWER_DB: D1Database`, `DOCS_BUCKET: R2Bucket`, etc.), so `env.TOWER_DB.prepare(...)` is fully typed and a typo in a binding name is a compile error instead of a 3am `undefined is not a function`. It's generated, not committed - regenerate it whenever `wrangler.toml` changes, same idea as a lockfile.
+`Env` isn't hand-written - `npx wrangler types` reads your `wrangler.toml` bindings (including the `[assets]` block) and generates a `worker-configuration.d.ts` with a matching `Env` interface (`TOWER_DB: D1Database`, `DOCS_BUCKET: R2Bucket`, etc.), so `env.TOWER_DB.prepare(...)` is fully typed and a typo in a binding name is a compile error instead of a 3am `undefined is not a function`. Regenerate the file whenever `wrangler.toml` changes. Whether to commit it is a project choice; outpost regenerates it instead.
 
 No auth code in there at all - Access sits in front of the hostname, so if the request reached this handler it's already authenticated. The one route that bypasses Access (the CLI push endpoint, machine-to-machine) checks its own key instead:
 
@@ -118,7 +119,7 @@ These are the numbers that actually gate a Worker, static assets or not:
 
 That write quota is the one to actually watch for a chatty app - outpost's CLI polling every 15 seconds and updating a handful of rows each time is nowhere near it, but a naive "log every event" design could burn through 100K writes fast. It's plain SQL (`wrangler d1 execute`, or `env.TOWER_DB.prepare(...).bind(...).run()` from a Worker) - no ORM required, no separate database server to provision.
 
-Plain SQLite only allows one writer at a time because the file is opened directly by whatever process is running - two Workers writing to the same file concurrently is exactly the "database is locked" scenario SQLite is known for. D1 sidesteps this structurally: each database is backed by exactly one primary [Durable Object](https://developers.cloudflare.com/durable-objects/), and Durable Objects guarantee there's only ever one live instance of a given object globally. Every Worker talks to that one instance over HTTP instead of opening the SQLite file itself, so writes are naturally serialized through a single owner - not parallel writers racing for a lock, but one queue. That single-threaded processing is also why D1's throughput is duration-bound rather than concurrency-bound: roughly 1,000 queries/second at 1ms each, 10/second at 100ms each, with an "overloaded" error if the queue backs up. Read replication (separate Durable Objects holding read-only copies, opted into with `Sessions`) scales reads across locations, but writes still get forwarded transparently to that same primary.
+Plain SQLite only allows one writer at a time because the file is opened directly by whatever process is running - two processes writing to the same file concurrently is exactly the "database is locked" scenario SQLite is known for. D1 sidesteps this structurally: each database is backed by one primary [Durable Object](https://developers.cloudflare.com/durable-objects/), so writes are serialized through a single owner rather than parallel processes opening the same SQLite file. That processing model is also why D1's throughput is duration-bound rather than concurrency-bound: Cloudflare gives rough examples of 1,000 queries/second at 1ms each or 10/second at 100ms each, with an "overloaded" error if the queue backs up. Read replication, opted into with `Sessions`, can spread reads across replicas, while writes still go to the primary.
 
 ### KV - a global, eventually-consistent cache
 
@@ -143,7 +144,7 @@ outpost uses it for exactly the blob-storage case that fits: pushed zip docs go 
 [Durable Objects](https://developers.cloudflare.com/durable-objects/) got added to the free plan in 2025 (SQLite-backed ones specifically). Useful once you need strongly-consistent state - a chat room, a game session, a single-writer counter - that a stateless Worker + D1 can't give you cleanly:
 
 - 5GB total DO storage on the free plan
-- ~100K requests/day, ~150M rows read/month, ~3M rows written/month
+- 100,000 requests/day, 5 million rows read/day, 100,000 rows written/day
 - Each incoming request resets a 30-second CPU budget for that object
 
 outpost doesn't need this (D1 + polling is enough), but it's the thing to reach for if "everyone editing the same doc in real time" shows up in a future vibe-coding session.

@@ -80,9 +80,11 @@ mistakes — the selection is built into how wheels work.
 
 Updates come for free too: `pip install -U mytool` or `uv tool upgrade mytool`
 pulls the latest release, no re-downloading the right file by hand. And with
-`uvx` you don't install anything permanently at all — `uvx mytool` downloads the
-right wheel into a transient cache, runs the binary, and leaves nothing behind,
-perfect for a one-off invocation or trying a tool before committing to it.
+`uvx` you don't install the tool onto `PATH` at all — `uvx mytool` downloads the
+right wheel into an isolated environment in uv's disposable cache and runs the
+binary. The cached environment may remain to make later invocations faster, and
+`uv cache clean` removes it. This is useful for a one-off invocation or trying a
+tool before committing to it.
 
 The mechanism is just the wheel filename. A wheel like
 `mytool-2.0.0-py3-none-manylinux_2_17_x86_64.whl` encodes its target platform in

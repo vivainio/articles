@@ -2,7 +2,7 @@
 
 *2026-05-28*
 
-Sometimes you don't need Flask, FastAPI, or Starlette. You need a 50-line script that fakes an upstream API while you build the client, or stands in for a webhook during a demo, or serves a couple of JSON blobs from a colleague's laptop. Pulling in a framework — and a virtualenv, and a `requirements.txt`, and a README explaining how to install it — for that is silly.
+Sometimes you don't need Flask, FastAPI, or Starlette. You need a 50-line script that fakes an upstream API while you build the client, or stands in for a webhook during a demo, or serves a couple of JSON blobs from a colleague's laptop. Adding and documenting a framework dependency for that can be unnecessary overhead.
 
 Python's `http.server` module already ships with everything you need. The default `BaseHTTPRequestHandler` API is just clunky enough that people reach for Flask instead. With about thirty lines of glue you can turn it into something that looks like a real micro-framework: route decorators, path parameters, JSON in and out.
 
@@ -61,14 +61,22 @@ Handler = Callable[..., Any]
 ROUTES: list[tuple[str, re.Pattern[str], Handler]] = []
 
 def route(method: str, pattern: str) -> Callable[[Handler], Handler]:
-    regex = re.compile("^" + re.sub(r"\{(\w+)\}", r"(?P<\1>[^/]+)", pattern) + "$")
+    parts = re.split(r"(\{\w+\})", pattern)
+    regex_text = "".join(
+        rf"(?P<{part[1:-1]}>[^/]+)" if part.startswith("{") else re.escape(part)
+        for part in parts
+    )
+    regex = re.compile("^" + regex_text + "$")
     def decorator(func: Handler) -> Handler:
         ROUTES.append((method, regex, func))
         return func
     return decorator
 ```
 
-`{id}` becomes a named capture group `(?P<id>[^/]+)`. When the path matches, `match.groupdict()` gives us a dict we can splat into the handler as keyword arguments.
+`{id}` becomes a named capture group `(?P<id>[^/]+)`. Everything outside the
+placeholders is escaped so a route containing a dot or another regex character
+still matches literally. When the path matches, `match.groupdict()` gives us a
+dict we can splat into the handler as keyword arguments.
 
 ## The Request Object
 
@@ -180,7 +188,10 @@ Now handlers can write `return 404, {"error": "no such user"}` when they want a 
 
 The `serve()` helper above uses `ThreadingHTTPServer` so parallel client requests don't block each other — one thread per request. If you'd rather have strict single-threaded behaviour (easier debugging, no concurrency surprises), swap it for `HTTPServer`. Either way, don't share mutable state across handlers without a lock.
 
-For the case where you just need to answer a few HTTP requests with canned data, the standard library has had you covered since Python 2. It just needed a tiny bit of sugar on top.
+For the case where you just need to answer a few HTTP requests with canned data,
+Python has long shipped the necessary server pieces. (`http.server` is the
+Python 3 module; Python 2 split them across modules such as `BaseHTTPServer`.)
+They just needed a tiny bit of sugar on top.
 
 ## Related writing
 

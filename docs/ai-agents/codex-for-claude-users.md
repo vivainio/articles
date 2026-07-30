@@ -205,19 +205,9 @@ Codex still has compatibility gaps. Tool hooks do not fire consistently for ever
 
 For now, port simple enforcement, logging, and post-edit hooks. Do not assume a sophisticated Claude Code hook setup is drop-in compatible without testing each event and output field.
 
-## Sessions and long-running work
-
-TODO: Cover resume/fork, background work, goals, and how Codex sessions fit into a tmux workflow.
-
 ## My practical migration checklist
-
-TODO: Add a short checklist for converting an existing `.claude` setup:
 
 1. Configure automatic approval review.
 2. Configure `/statusline`.
 3. Recreate any MCP servers that are actually useful.
 4. Test the repository's commands in the sandbox.
-
-## Other practical differences
-
-TODO: Finish with opinionated observations after using both tools on real projects: where Codex feels better, where Claude Code still feels smoother, and which differences are merely muscle memory.

@@ -25,7 +25,12 @@ ROUTES: list[tuple[str, re.Pattern[str], Handler]] = []
 
 
 def route(method: str, pattern: str) -> Callable[[Handler], Handler]:
-    regex = re.compile("^" + re.sub(r"\{(\w+)\}", r"(?P<\1>[^/]+)", pattern) + "$")
+    parts = re.split(r"(\{\w+\})", pattern)
+    regex_text = "".join(
+        rf"(?P<{part[1:-1]}>[^/]+)" if part.startswith("{") else re.escape(part)
+        for part in parts
+    )
+    regex = re.compile("^" + regex_text + "$")
 
     def decorator(func: Handler) -> Handler:
         ROUTES.append((method, regex, func))

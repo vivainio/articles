@@ -109,7 +109,7 @@ Scrolling up with the mouse wheel enters copy mode automatically - this can catc
 | Search | `/` (forward), `?` (backward), `n`/`N` to jump between matches |
 | Start selection | `Space` |
 | Copy | `Enter` |
-| Paste | `Ctrl+v` |
+| Paste tmux buffer | `Prefix + ]` |
 | Exit | `q` |
 
 ## Level 5: Extensibility
