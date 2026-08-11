@@ -118,6 +118,14 @@ These are `type = "popup"` or `type = "shell"` commands under `[[keys.command]]`
 
 This is where Herdr stops being "just tmux." The sidebar shows every agent pane's state at a glance - working, idle, or waiting on you - and you can act on that state without leaving the keyboard:
 
+My config binds `Alt+Shift+Up` and `Alt+Shift+Down` to the previous and next agent, respectively. Unlike `Alt+Up/Down`, which moves between workspaces, these shortcuts follow the agent list directly, making it quick to cycle through active agents without reaching for the mouse:
+
+```toml
+[keys]
+previous_agent = "alt+shift+up"
+next_agent = "alt+shift+down"
+```
+
 ```bash
 herdr agent list                  # every agent pane and its state
 herdr agent wait <id> --state idle  # block until an agent needs you
