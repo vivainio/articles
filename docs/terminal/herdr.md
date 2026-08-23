@@ -136,7 +136,7 @@ Worktrees take this further: `Prefix + Shift+G` creates a new Git worktree-backe
 
 Herdr generates a random branch name for each new worktree, such as `worktree/calm-forest-c059`, and checks it out below `~/.herdr/worktrees/<repository>/`, for example `~/.herdr/worktrees/articles/worktree-calm-forest-c059`.
 
-> **Claude Code note:** Claude Code also offers its own worktree management, especially when using its agents mode. That is a separate mechanism from Herdr-managed worktrees, so Herdr's worktree layout and lifecycle may not integrate as closely with workflows that expect Claude Code to create and manage the checkouts itself.
+> **Claude Code note:** I tested Herdr-managed worktree workspaces with Claude Code, and they work great together. Claude Code also offers its own worktree management, especially in agents mode, but you do not need to use it: launch Claude Code inside the workspace Herdr creates, and it works normally in that checkout.
 
 ```bash
 herdr worktree list
