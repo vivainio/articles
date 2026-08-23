@@ -11,6 +11,41 @@ If you already use Claude Code, Codex feels familiar within a few minutes: start
 
 This guide covers the differences that matter when moving between the two.
 
+## Luna changes the price comparison
+
+For API-funded agent runs, GPT-5.6 Luna is now dramatically cheaper than even
+Claude's economy model. OpenAI cut Luna's price by 80%; its current rates are
+$0.20 for input, $0.02 for cached input, and $1.20 for output per million
+tokens. Here is the comparison as of August 23, 2026:
+
+| Model | Input | Cached input | Output |
+| --- | ---: | ---: | ---: |
+| GPT-5.6 Luna | $0.20 | $0.02 | $1.20 |
+| Claude Haiku 4.5 | $1.00 | $0.10 | $5.00 |
+| Claude Sonnet 5 | $2.00 | $0.20 | $10.00 |
+| Claude Opus 5 | $5.00 | $0.50 | $25.00 |
+
+All figures are USD per million tokens at standard API rates. That makes Luna
+five times cheaper than Haiku on input and about four times cheaper on output.
+Against Sonnet 5, it is ten times cheaper on input and more than eight times
+cheaper on output. The cached-input ratios match the input ratios.
+
+Those numbers come from the current [OpenAI Luna model
+page](https://developers.openai.com/api/docs/models/gpt-5.6-luna) and
+[Anthropic API pricing](https://platform.claude.com/docs/en/about-claude/pricing).
+They do not make the models equivalent in capability, latency, or tokenization,
+and they do not compare the bundled usage limits in Codex or Claude Code
+subscriptions. Still, for high-volume delegated work where Luna is capable
+enough, the price gap is now too large to treat as a footnote.
+
+The available independent benchmark also favors Luna. In [Artificial
+Analysis's direct comparison](https://artificialanalysis.ai/models/comparisons/gpt-5-6-luna-vs-claude-4-5-haiku-reasoning),
+Luna with maximum reasoning scores 52 against Haiku 4.5 with reasoning at 30
+on its composite Intelligence Index. Luna generates output faster, too, but
+Haiku starts responding much sooner: about 21 seconds to Luna's 107 seconds in
+that test. This is one aggregate benchmark, not proof that Luna wins every
+coding workload, but it makes the low price look more substantive.
+
 ## Permissions have two dimensions
 
 This is the difference most worth understanding early.
@@ -43,6 +78,18 @@ Codex session. There is no need to press `Shift+Tab` after launching Codex in
 each repository. I always use this auto mode; I prefer letting the reviewer
 handle routine escalation decisions instead of interrupting the session for
 manual confirmation.
+
+There is an important reliability problem, though: the automatic reviewer can
+hang while processing an approval or eventually time out. When that happens,
+approval-dependent work grinds to a halt. Claude Code lets you press
+`Shift+Tab` to leave its auto mode and handle approvals manually, but Codex has
+no equivalent in-session escape hatch. You can therefore get stuck waiting for
+a reviewer that is no longer approving anything, making it effectively
+impossible to continue the task in that session. Interrupting the session and
+relaunching Codex usually gets approval handling working again, but that does
+not make this merely a troubleshooting footnote. It is a recurring reliability
+problem in a core workflow, and a concrete reason to prefer Claude Code until
+Codex addresses it.
 
 ## Command rules and the automatic reviewer are separate
 
