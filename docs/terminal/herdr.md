@@ -16,6 +16,22 @@ Agent awareness is the specialization on top. When you do run several Claude Cod
 
 For an existing tmux user, the switch can be almost frictionless. Herdr does not read `tmux.conf`, but you can assign your familiar prefix and navigation, tab, split, resize, and workspace bindings to their Herdr equivalents. The underlying model and everyday gestures remain close enough that most muscle memory carries over. The major addition is the extremely useful left sidebar, which keeps workspaces and agent states visible instead of making you recall or open a separate session list, and lets you jump between them directly with the mouse.
 
+## Windows Installation
+
+First try the Windows installation instructions on the [Herdr website](https://herdr.dev/docs/install/). If the website installer does not work, open PowerShell and install [Zipget](https://github.com/vivainio/zipget-rs):
+
+```powershell
+iwr https://github.com/vivainio/zipget-rs/releases/latest/download/zipget-windows-x64.exe -OutFile ~/.local/bin/zipget.exe
+```
+
+Then use Zipget to install Herdr:
+
+```powershell
+zipget install herdrdev/herdr --exe herdr.exe
+```
+
+Both commands install into `~/.local/bin`. That directory is usually already on your `PATH`, especially if you use tools such as [uv](https://docs.astral.sh/uv/). If PowerShell cannot find `zipget` or `herdr`, add `~/.local/bin` to your user `PATH` and open a new terminal.
+
 ## Setting Up config.toml
 
 My config is entirely optional. If you prefer to navigate mostly with the mouse, start with Herdr's defaults. The custom config both preserves my tmux muscle memory and adds ergonomic choices that I prefer, most notably prefix-free `Alt+Arrow` navigation and a comfortable `Ctrl+Space` prefix.
