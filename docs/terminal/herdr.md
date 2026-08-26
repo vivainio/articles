@@ -36,10 +36,17 @@ Both commands install into `~/.local/bin`. That directory is usually already on 
 
 My config is entirely optional. If you prefer to navigate mostly with the mouse, start with Herdr's defaults. The custom config both preserves my tmux muscle memory and adds ergonomic choices that I prefer, most notably prefix-free `Alt+Arrow` navigation and a comfortable `Ctrl+Space` prefix.
 
-Grab my config and drop it in as `~/.config/herdr/config.toml`, mirroring the way `~/dotfiles/tmux.conf` is linked as `~/.tmux.conf`:
+Grab my config and save it as `~/.config/herdr/config.toml` on Linux or macOS, mirroring the way `~/dotfiles/tmux.conf` is linked as `~/.tmux.conf`:
 
 ```bash
 curl -o ~/.config/herdr/config.toml https://raw.githubusercontent.com/vivainio/dotfiles/master/herdr/config.toml
+```
+
+On Windows, Herdr reads the config from `%APPDATA%\herdr\config.toml`. Download it from PowerShell with:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:APPDATA\herdr" | Out-Null
+iwr https://raw.githubusercontent.com/vivainio/dotfiles/master/herdr/config.toml -OutFile "$env:APPDATA\herdr\config.toml"
 ```
 
 Reload it from inside Herdr with `Prefix + Shift+R` instead of restarting.
