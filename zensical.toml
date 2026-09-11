@@ -34,6 +34,7 @@ nav = [
   { "Infrastructure experiments" = [
     { "Overview" = "infrastructure/index.md" },
     { "Ejecting Serverless with Jsonnet" = "infrastructure/jsonnet-cloudformation/index.md" },
+    { "Document Processing Pipeline with Lambda Durable Functions" = "infrastructure/document-pipeline-durable-functions.md" },
   ] },
 ]
 
