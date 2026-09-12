@@ -59,6 +59,21 @@ status: waiting for approval
 
 That makes a useful operational question easy to answer: “Who owes the next action, and how long have they been waiting?”
 
+## Seeing the workflow as a whole
+
+A **workflow tracker** can query the shared records to show where each document is and how much work each service owns:
+
+| Service | Documents assigned |
+|---|---:|
+| Extraction | 24 |
+| Classification | 8 |
+| Review | 137 |
+| Finalization | 3 |
+
+These illustrative counts include queued, running, and waiting work. Click Review to list its documents, oldest assignment first; open `invoice-42` to see its current status and handoff history.
+
+The follow-up, [A Workflow Tracker for the EventBridge Pipeline](document-pipeline-workflow-tracker.md), explores those queries, a possible DynamoDB schema and indexes, and how to maintain service counts.
+
 ## Following one document
 
 Extraction finishes, and classification identifies the invoice as needing a person's approval. Routing assigns it to review:
