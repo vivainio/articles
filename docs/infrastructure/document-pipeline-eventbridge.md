@@ -2,33 +2,50 @@
 
 *2026-09-12*
 
-The [durable-functions version](document-pipeline-durable-functions.md) gives one execution responsibility for the whole document pipeline. Here, extraction, classification, review, and finalization each own their stage. EventBridge connects them; a shared orchestrator API, `emit(...)`, records transitions and arranges delivery.
-
-The central invariant is **one owner for the document's next required action**. Completing a stage means handing responsibility to the next service. The owner is explicit in the event and in DynamoDB, so an operator can ask "who owes the next action, and since when?" without reconstructing the event history.
-
-## A handoff transfers ownership
-
-A stage hands off through one interface. The examples below are conceptual pseudocode, not AWS SDK calls:
+Imagine a user uploads an invoice. The upload service announces `DocumentUploaded`. The extraction service picks it up, reads the document, and announces `DocumentClassifiable`. Classification then does its part, followed by review and finalization.
 
 ```text
-emit(
-    eventId=stable_completion_id,
-    eventType="DocumentClassified",
-    tenantId=tenant_id,
-    documentId=document_id,
-    processingRunId=run_id,
-    sender="classification",
-    expectedOwnershipVersion=12,
-    owner="review",
-    payload={classificationRef: immutable_result_ref, reviewRequestId: review_id},
-)
+Upload         → DocumentUploaded
+Extraction     → DocumentClassifiable
+Classification → DocumentClassified
+Routing        → ReviewRequested
+Review         → DocumentApproved
+Finalization   → DocumentFinalized
 ```
+
+Each event says what just happened. The next service reacts to that event and carries the work forward.
+
+**Amazon EventBridge is an event bus:** services publish events to it, and rules route those events to interested services. The upload service does not need to call extraction directly. It publishes `DocumentUploaded`, and an EventBridge rule delivers that event to extraction. Another rule could send the same event to analytics without changing the upload service.
+
+This style is called **choreography**: services coordinate through events, with each service owning its part of the process. The [durable-functions version](document-pipeline-durable-functions.md) instead gives one execution responsibility for the whole pipeline.
+
+## Start with a handoff
+
+In this design, services publish through a shared API called `emit`. The upload service starts the pipeline with:
+
+```text
+emit("DocumentUploaded", documentId="invoice-42", owner="extraction")
+```
+
+Once extraction has collected the document's text, it hands over to classification:
+
+```text
+emit("DocumentClassifiable", documentId="invoice-42", owner="classification")
+```
+
+These are simplified, conceptual calls, not AWS SDK calls. Result references and reliability fields are omitted here; the later sections explain how acceptance and retries work.
+
+The key idea is **one owner for the document's next required action**. After upload, extraction owes the next action. After extraction, classification does. Other subscribers can observe events without taking on that responsibility.
+
+EventBridge routes the events. Our shared `emit` API records the handoff and arranges delivery. Keeping the owner in DynamoDB lets an operator ask “who owes the next action, and since when?” without reconstructing the event history.
+
+## Making the handoff reliable
 
 **Ownership transfers when `emit` durably accepts the handoff.** Until then, the sender remains responsible. After acceptance, the new owner is responsible even while its work is queued; the delivery infrastructure must deliver the assignment.
 
 If the response is lost, retry with the same event ID and contents. `emit` returns the original receipt; reusing the ID with different contents is an error. The producer must store its completion intent durably or reconstruct it from a redelivered task.
 
-An explicit `owner` couples the producer to its destination. For independent routing, a routing service or versioned policy can choose the owner instead. Persist that choice before publication. The example above chooses review directly; the pipeline table below uses a routing service.
+An explicit `owner` couples the producer to its destination. For independent routing, a routing service or versioned policy can choose the owner instead. Persist that choice before publication. The examples above choose the next owner directly; after classification, the pipeline below uses a routing service to choose review or finalization.
 
 The emitter declares `sender` as a logical service name, regardless of where it runs. The API checks the current owner against `sender`, checks `expectedOwnershipVersion`, and validates the transition. These are workflow consistency checks, not authentication. Owner and version checks run inside the transaction.
 
@@ -96,13 +113,11 @@ Keep transactions bounded: store large manifests immutably and create determinis
 The document's authoritative coordination item might contain:
 
 ```text
-tenantId, documentId, processingRunId
+documentId: invoice-42
 owner: review
 status: pending-review
 ownershipVersion: 13
-assignedAt: ...
 dueAt: ...
-reviewRequestId: ...
 ```
 
 `owner` describes responsibility; `status` describes progress. Use separate state revisions to protect concurrent updates within an assignment.
@@ -110,11 +125,9 @@ reviewRequestId: ...
 Each assignment event carries `ownershipVersion`. The receiver copies it unchanged into `expectedOwnershipVersion` on its next handoff. Services neither increment it nor need to query for it.
 
 ```text
-A receives an assignment with ownershipVersion: 12
-A → Emit(sender: A, expectedOwnershipVersion: 12, owner: B)
-Orchestrator → B: event with owner: B, ownershipVersion: 13
-B → Emit(sender: B, expectedOwnershipVersion: 13, owner: C)
-Orchestrator → C: event with owner: C, ownershipVersion: 14
+Extraction receives version 12.
+Extraction hands off to classification, expecting version 12.
+The API accepts the handoff and assigns classification version 13.
 ```
 
 The orchestrator atomically checks and increments the version when accepting a handoff, storing it in the assignment and outgoing event. Publication retries and reports without a handoff keep the version unchanged. File and page assignments follow the same rule with task versions.
@@ -151,17 +164,7 @@ Cancel schedules after decisions and delete completed schedules. A reconciler ch
 
 ## Preserve event meaning on retries
 
-Use a common envelope:
-
-```text
-eventId, eventType, schemaVersion
-tenantId, documentId, processingRunId
-causationId, occurredAt
-sender                        # declared logical service name
-owner, ownershipVersion       # document assignment, where relevant
-taskId, taskVersion           # separately scoped work, where relevant
-payload / immutable artifact references
-```
+Production events need a common envelope with a stable event ID, event type, schema version, document and processing-run identity, and the relevant ownership or task version. Include the sender, causation ID, timestamp, and immutable result references. In a multi-tenant system, include tenant identity too.
 
 An allow-listed context record can simplify producers, but resolve its fields when accepting the transition and freeze them in the outgoing envelope. Reading the latest context during publication could attach a new classification or source object to an old event on retry.
 
