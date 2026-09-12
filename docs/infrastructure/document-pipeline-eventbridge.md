@@ -36,16 +36,22 @@ This style is called **choreography**: services coordinate through events, with 
 For this concept, services publish through a shared API called `emit`. The upload service starts the pipeline with:
 
 ```text
-emit("DocumentUploaded", documentId="invoice-42", owner="extraction")
+emit("DocumentUploaded", documentId="invoice-42",
+     sender="upload", nextOwner="extraction")
 ```
 
 Once extraction has the document's text, it hands over to classification:
 
 ```text
-emit("DocumentClassifiable", documentId="invoice-42", owner="classification")
+emit("DocumentClassifiable", documentId="invoice-42",
+     sender="extraction", nextOwner="classification")
 ```
 
 These are conceptual calls. `emit` is our application's handoff API, built around EventBridge.
+
+`sender` identifies the service making the handoff; `nextOwner` says who should take over. The handoff API verifies the sender against the authenticated caller and checks that it matches the document's recorded current owner. It also checks that the requested transition is allowed. If classification tries to advance a document still owned by extraction, the API rejects the handoff and reports an ownership mismatch. Ownership stays with extraction.
+
+`DocumentUploaded` creates the initial assignment, so it has no previous owner to check. The API verifies that the upload service is allowed to start the workflow and that it is not replacing an existing assignment.
 
 The key idea is **one owner for the document's next required action**. After upload, extraction owes the next action. After extraction, classification does. The handoff records who is responsible next and arranges delivery of the event.
 
@@ -79,7 +85,8 @@ The follow-up, [A Workflow Tracker for the EventBridge Pipeline](document-pipeli
 Extraction finishes, and classification identifies the invoice as needing a person's approval. Routing assigns it to review:
 
 ```text
-emit("ReviewRequested", documentId="invoice-42", owner="review")
+emit("ReviewRequested", documentId="invoice-42",
+     sender="routing", nextOwner="review")
 ```
 
 The review service now owns the next action. The document can wait there for hours or days while the person decides. An EventBridge Scheduler timer could prompt the service to handle an expired review.
@@ -87,7 +94,8 @@ The review service now owns the next action. The document can wait there for hou
 When the person approves, review hands the document to finalization:
 
 ```text
-emit("DocumentApproved", documentId="invoice-42", owner="finalization")
+emit("DocumentApproved", documentId="invoice-42",
+     sender="review", nextOwner="finalization")
 ```
 
 Finalization stores the approved document and announces `DocumentFinalized`. The pipeline is complete, so there is no next owner.

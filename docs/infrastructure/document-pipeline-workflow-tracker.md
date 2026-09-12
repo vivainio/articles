@@ -21,7 +21,7 @@ The schema below is one possible way to support this view with DynamoDB. The doc
 
 ## Where the tracker gets its information
 
-The shared `emit` API already records the next owner when accepting a handoff. The tracker can read that record through a query API:
+The shared `emit` API verifies the sender against the current owner, then records `nextOwner` as the new owner when accepting a handoff. The tracker can read that record through a query API:
 
 ```mermaid
 flowchart LR
@@ -109,16 +109,19 @@ GSI reads are eventually consistent: a document can briefly appear under its pre
 
 For a small prototype, the tracker could count the owner query's results. However, `Select=COUNT` still consumes read capacity and requires pagination beyond the query page limit; it is not a constant-cost aggregate. A changing, paginated index also does not provide a single snapshot. See [DynamoDB query counts](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.Other.html).
 
-For a frequently refreshed dashboard, maintain a count per owner. When a document moves from classification to review, accept these changes in one transaction:
+For a frequently refreshed dashboard, maintain a count per owner. When a document moves from routing to review, accept these changes in one transaction:
 
 ```text
-Check the document's expected version and current owner.
+Verify the authenticated caller matches sender.
+Require the stored owner to equal sender and the version to match.
 Set its owner to review and increment its version.
-Decrease classification's count by one.
+Decrease routing's count by one.
 Increase review's count by one.
 Append history and record the outgoing event intent.
 Record a receipt for this handoff's stable event ID.
 ```
+
+The owner and version checks are conditions on the state update inside the transaction. A wrong sender or stale version rejects the handoff without changing state, counts, or outgoing intents. Record the rejected attempt separately for troubleshooting. The version also prevents an old completion from being accepted if the document later returns to the same service. The initial upload instead requires permission to create the workflow and a condition that its state does not already exist.
 
 Initial assignment increments only the first owner's count; completion decrements only the last owner's count. Progress within the same assignment leaves counts unchanged. Every ownership-changing path must use the same accounting.
 
