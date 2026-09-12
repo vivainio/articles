@@ -124,6 +124,43 @@ def record_event(document_id, detail_type, payload):
 
 That answers "what happened to document X" as a query over one partition key. It doesn't answer "show me everything currently `pending-review`" cheaply — that needs knowing no *later* event exists for each document, which a log alone can't tell you without a scan. `record_event` also upserts a second item, `document_id` → `currentStage`, `updatedAt`, with a GSI on `currentStage`, so the dashboard query doesn't touch the log's shape at all.
 
+## Threading context forward without re-passing it
+
+A stage Lambda only knows the fields on the event that triggered it. Without help, that means `classify` has to manually forward `bucket`/`key` from three stages back just so `finalize` can still see them — every stage becomes responsible for re-threading fields it never actually uses. Since the orchestrator already reads and writes a per-document row for the current-state projection, it can do the threading instead: merge an allow-listed set of fields from each incoming payload into that row, then merge the row back into whatever it publishes.
+
+```python
+FORWARDED_FIELDS = {
+    "DocumentUploaded": ("bucket", "key"),
+    "DocumentClassified": ("classification",),
+}
+
+def record_event(document_id, detail_type, payload):
+    table.put_item(Item={  # unchanged: append-only log entry
+        "documentId": document_id,
+        "sortKey": f"{int(time.time() * 1000)}#{detail_type}",
+        "detailType": detail_type,
+        "payload": payload,
+    })
+
+    fields = {k: payload[k] for k in FORWARDED_FIELDS.get(detail_type, ()) if k in payload}
+    if fields:
+        expr = ", ".join(f"context.#{k} = :{k}" for k in fields)
+        context_table.update_item(
+            Key={"documentId": document_id},
+            UpdateExpression=f"SET {expr}",
+            ExpressionAttributeNames={f"#{k}": k for k in fields},
+            ExpressionAttributeValues={f":{k}": v for k, v in fields.items()},
+        )
+
+def enrich(document_id, payload):
+    context = context_table.get_item(Key={"documentId": document_id}, ConsistentRead=True)
+    return {**context.get("Item", {}).get("context", {}), **payload}
+```
+
+`orchestrator_handler` calls `enrich(document_id, next_event["payload"])` before publishing, so `DocumentClassifiable` goes out carrying `bucket`/`key` even though nothing between `split` and the fan-in gate ever touched them.
+
+Two things keep this from turning into an unbounded blob: the allow-list is explicit per `detailType` — the orchestrator threads forward the handful of fields something downstream actually needs, not the raw payload of every event that ever fired for the document — and the read is strongly consistent, since a stage can call the orchestrator again moments after a previous call updated the same row and a stale read would silently drop a field that should already be there. If a field belongs to a fan-in (per-page text, say), it stays out of the allow-list entirely and out of `context` — that data lives in the log or in S3, referenced by pointer, not flattened into every event downstream.
+
 ## Waits and timeouts without a wait primitive
 
 `context.wait(duration)` has no EventBridge equivalent — the bus doesn't hold anything between an event being published and a rule matching it. A review deadline needs something to actually schedule a future call: [EventBridge Scheduler](https://docs.aws.amazon.com/scheduler/latest/UserGuide/what-is-scheduler.html) creates a one-time schedule that invokes the orchestrator directly at a specific timestamp, the same way a stage Lambda would:
