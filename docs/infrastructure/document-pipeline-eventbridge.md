@@ -130,6 +130,8 @@ The orchestrator sits downstream of OCR, not in front of it, so it can't cap con
 
 `emit` and EventBridge are both at-least-once, so any gate touching shared state needs its own dedup — `incr_counter` above only counts a `pageIndex` it hasn't seen, and `claim_decision` is a conditional write for the same reason. A gate that just re-yields its input needs nothing extra; a gate that mutates state does, since nothing underneath is doing that for it the way checkpointed steps did.
 
+It's not just retry-until-delivered on the bus-to-target hop, either: `PutEvents` itself has no idempotency token — nothing like SQS FIFO's `MessageDeduplicationId` — so a retried `emit` call after a dropped response is indistinguishable from two genuinely separate events. There's no layer anywhere in this chain that will collapse a duplicate for you; the gates above are doing real work, not defensive overkill.
+
 ## Scaling to a million documents
 
 The durable article answered this with "one execution per document, and the platform carries it" — but a durable execution is still a resident thing: it counts against a documented concurrency quota (1,000,000 concurrently *running* executions, including ones parked in a review wait) and each one is capped at 3,000 operations and 100MB of checkpointed payload. Choreography has no equivalent object to cap, because nothing is resident. A document sitting in `pending-review` isn't occupying any AWS-managed workflow slot — it's a few hundred bytes in a DynamoDB item, and between events, that's the *entire* footprint. There's no "concurrently waiting workflows" ceiling to raise, because there's no workflow anywhere to count.
