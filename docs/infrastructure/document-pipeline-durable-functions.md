@@ -27,6 +27,19 @@ Everything interesting happens through `context`:
 
 The mental model is replay-based: on every resume, your function body runs again from the top, but each `context.step()` call short-circuits to its saved result until execution reaches the point it actually needs to resume from. That's why step bodies have to be idempotent — a step can be attempted more than once before its checkpoint is durably recorded, even though you'll never see a *completed* step re-run.
 
+## A note on terminology
+
+"Step" gets overloaded fast once a pipeline has business stages that don't map cleanly onto `context.step()`, so it's worth pinning down what everything in this article actually means before going further:
+
+- **Step** — specifically `context.step(fn, name=...)`. Runs *inline*, in the current invocation, and returns before the function moves on. It never suspends the execution and never involves anything outside this Lambda environment. "Extract text from this page" is a step.
+- **Stage** — an informal term for a phase of the *business* workflow ("extraction," "review," "indexing"), used in this article when talking about the pipeline's shape rather than the SDK. A stage might be implemented as one step, or as a wait, an invoke, a `wait_for_callback`, or a `map` over several of those — the word doesn't imply a particular primitive.
+- **Execution** — one running instance of the whole durable function, from its first invocation to its final return. It has an identity (an execution name, for the idempotent-start dedup covered earlier) and can be suspended and resumed many times over a lifetime that might span days.
+- **Orchestrator** — this article's name for the durable execution that owns the pipeline's overall control flow — the thing deciding what happens next, not a specific SDK type. Everything in "The pipeline" section runs inside the orchestrator.
+- **Hand-off** — what happens when a stage's work isn't done by code running inside the orchestrator's own invocation, but by something else the orchestrator has to suspend and wait on: another Lambda function, an external service, a human. This is the case this section's "Step vs. hand-off" split below is about.
+- **Callback** — the specific mechanism (`wait_for_callback`, and the `SendDurableExecutionCallback*` API on the other end) by which a hand-off to something that *doesn't* return a value directly reports its result back into a suspended orchestrator.
+
+The distinction that actually matters for how you write the code: **is the next stage something the orchestrator calls, or something the orchestrator calls out to and gets called back by?** A stage that's pure logic, or a synchronous call to a Lambda function whose ARN you have, is a step or an `invoke` — the orchestrator is in the driver's seat the whole time. A stage that's a human, an asynchronous external process, or anything whose completion doesn't arrive as a direct return value needs a hand-off via `wait_for_callback` — the orchestrator suspends and something else has to actively reach back in.
+
 ## The pipeline
 
 Take a document upload pipeline: extract text per page, classify the document, route anything sensitive or low-confidence to a human reviewer, then finalize. In plain durable-function code:
@@ -145,9 +158,9 @@ Whether that needs an HTTP hop at all depends on who's calling back in. If the t
 
 This is IAM authentication, not a webhook-with-a-secret — the caller needs SigV4-signed AWS credentials and an identity policy granting `SendDurableExecutionCallback*`. That rules out calling it directly from a reviewer's browser or an email link; something holding IAM credentials (a Lambda function, an ECS task, a CI job) has to make the call on the reviewer's behalf, after checking whatever auth the review UI itself uses. It's also scoped tighter than the function: a durable execution is a sub-resource of a specific function *version*, so the policy's `Resource` needs the `:*` qualifier (`arn:aws:lambda:us-east-1:123456789012:function:myDurableFunction:*`) to actually match — an unqualified function ARN won't authorize the callback.
 
-## The only two ways an execution actually resumes
+## How an execution actually resumes
 
-`DurableContext` exposes several operations — Step, Wait, Callback, Invoke, Parallel, Map, and a child-context grouping — but underneath all of them, a *suspended* execution only ever wakes back up for one of two reasons:
+`DurableContext` exposes several operations — Step, Wait, Callback, Invoke, Parallel, Map, and a child-context grouping — but underneath all of them, a *suspended* execution only wakes back up for a small number of reasons:
 
 **A clock runs out — `context.wait(duration)`.** Pure time-based resume, no external actor involved. Give it a duration — a fixed number of seconds, or a computed offset like "until 2am" — and the runtime suspends billing nothing, then wakes the execution back up on its own once the time elapses. Nothing outside Lambda needs to know the execution exists.
 
@@ -155,10 +168,11 @@ This is IAM authentication, not a webhook-with-a-secret — the caller needs Sig
 
 `SendDurableExecutionCallbackHeartbeat` sits next to this but isn't a third resume trigger — it doesn't wake anything up, it just resets the timeout clock on a still-pending callback, for something like "the reviewer opened the form and is still filling it in, don't expire this yet."
 
-Everything else on `DurableContext` composes those two rather than adding a new one:
+There's actually a third: **`context.invoke(target_arn, payload, name=...)`** calls another Lambda function directly and suspends the orchestrator until it returns — the docs use the word "suspends" here too, the same as `wait`. The difference from `wait_for_callback` is who's doing the signaling: with `wait_for_callback`, some external actor has to independently call `SendDurableExecutionCallbackSuccess` with a `callback_id` you handed it yourself. With `invoke`, the platform is managing that same signal-and-resume mechanism *for you* — you never see a callback ID, because Lambda already knows exactly which invocation it's waiting on and resumes the orchestrator automatically when that invocation's response comes back. In the terms from the note above, it's on the "orchestrator calls" side of the split, not the "hand-off" side — the orchestrator is in the driver's seat the whole time, picking the callee and using its return value directly — it just isn't inline the way a `context.step()` is, since the callee can take a long time and the orchestrator suspends for it.
 
-- **`context.invoke(...)`** calls another Lambda function and checkpoints the result — really a specialized `step`, not something that suspends waiting on an outside signal.
-- **`context.map` / `context.parallel`** run branches concurrently and join on all of them, but each branch resumes via a clock or a callback individually — map/parallel is the fan-out-and-join shape wrapped around those two primitives, not a resume mechanism of its own (this is the "wait for many streams" pattern from the scaling section: N branches, each on its own timer or callback, `map` as the barrier that waits for all of them).
+So the honest count is: a clock, an external caller you have to wire up yourself, or another Lambda invocation the platform tracks on your behalf — reach for `invoke` whenever the next stage can be expressed as "call this function ARN and use its return value," and fall back to `wait_for_callback` only when it can't (a human, an async external process, anything that doesn't hand you a result through a Lambda response).
+
+`context.map` / `context.parallel` don't add a fourth: they run branches concurrently and join on all of them, but each branch resumes via a clock, a callback, or an invoke individually — map/parallel is the fan-out-and-join shape wrapped around those primitives, not a resume mechanism of its own (this is the "wait for many streams" pattern from the scaling section: N branches, each on its own timer, callback, or invoke, `map` as the barrier that waits for all of them).
 
 ## Callbacks aren't just for humans
 
