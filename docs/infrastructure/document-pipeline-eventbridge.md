@@ -19,6 +19,16 @@ Each event says what just happened. The next service reacts to that event and ca
 
 **Amazon EventBridge is an event bus:** services publish events to it, and rules route those events to interested services. The upload service publishes `DocumentUploaded`, and an EventBridge rule delivers that event to extraction. Another rule could send the same event to analytics without changing the upload service.
 
+You subscribe by creating a **rule**: an event pattern says which events you want, and a target says where to send them. A rule can match one event type, such as `DocumentUploaded`, or several, such as `DocumentApproved` and `DocumentRejected`. See [EventBridge rules](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rules.html).
+
+A common target is an **SQS queue**, which holds the matching events until the receiving service processes them:
+
+```text
+Upload service → EventBridge → rule matching DocumentUploaded → SQS → Extraction service
+```
+
+Each interested service can have its own rule and queue. EventBridge can also deliver directly to targets such as Lambda functions. See [EventBridge targets](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-targets.html).
+
 This style is called **choreography**: services coordinate through events, with each service owning its part of the process. The [durable-functions version](document-pipeline-durable-functions.md) instead gives one execution responsibility for the whole pipeline.
 
 ## Passing responsibility with the event
