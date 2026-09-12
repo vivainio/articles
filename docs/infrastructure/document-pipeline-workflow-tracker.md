@@ -78,6 +78,46 @@ dueAt: '2026-09-13T09:20:00Z'
 
 For clarity, these examples assume one workflow run per document in one scope. Multiple tenants need tenant-scoped keys and authorization. If reprocessing is supported, include run identity in state, history, and handoffs, and decide whether counts represent active runs or distinct documents.
 
+## Transition versions and replay
+
+The handoff API assigns a monotonically increasing `version` for each accepted state change within a document's workflow run. Store it in the current state, history, and outgoing event in the same transaction. The initial assignment gets version 1; the next accepted transition gets version 2. A rejected request or a retry of an accepted request creates no new version.
+
+For example, review receives an assignment at version 7 and completes it with:
+
+```text
+emit("DocumentApproved", documentId="invoice-42",
+     sender="review", nextOwner="finalization", expectedVersion=7)
+```
+
+The API checks the owner and expected version, accepts the transition as version 8, and includes version 8 in the event sent to finalization. If a service reports intermediate progress, that also advances the state version; its later completion must use the version returned by that accepted update.
+
+Keep a stable application `eventId` in the event payload alongside the version. Check for an existing acceptance receipt first: retrying the same request returns the original result even if ownership has since moved. A reused ID with different contents is an error. The version condition protects against a different, stale request.
+
+### What happens during an EventBridge replay?
+
+Suppose `DocumentApproved` at version 8 has already been handled, and an archive replay delivers it again. The event retains its application event ID, document/run identity, and version. It is another delivery of the original transition, so no new transition version is allocated just for replay.
+
+EventBridge can replay an archive to selected rules, but events are [not guaranteed to replay in their original order](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_StartReplay.html). The application therefore needs checks appropriate to each consumer:
+
+| Consumer | Replay behavior |
+|---|---|
+| Latest-state tracker projection | Apply a full state snapshot only when its version exceeds the stored version for that document/run |
+| Worker performing an action | Look up its durable completion record for the event; skip completed work and resume unfinished work |
+| History or analytics requiring every transition | Deduplicate by event ID; retain unseen older events even if a newer version arrived first |
+| Handoff API receiving a retried completion request | Return the existing receipt, or reject a stale owner/version if it is a different request |
+
+A “highest version seen” check is suitable for a latest-state projection only when each event carries the complete state that projection needs. Delta-based projections must handle gaps and ordering, or rebuild from accepted history. A subscriber matching only some event types will naturally see gaps in the document sequence.
+
+For workers, recording an event as *seen* is not enough to prove its action finished. Scope completion records by consumer and application event ID, and coordinate concurrent attempts with a conditional claim and a recovery path for abandoned work. When an external action cannot share the completion transaction, use a stable downstream idempotency key or reconcile the outcome before repeating it. Owner/version checks prevent stale handoffs; they do not undo a duplicated external action.
+
+Keep receipts and completion records for the supported replay period. Otherwise, an old event can look new after its deduplication record expires. Likewise, the document's current version alone cannot prove an independent subscriber has processed an older event.
+
+### Rebuilding a tracker versus rerunning the workflow
+
+To rebuild a separate tracker projection, replay to its rule with fresh projection state and leave business-action consumers out of that replay. Full snapshots let the projection converge on the highest version even when delivery is out of order. Keep the authoritative workflow state and acceptance receipts intact.
+
+To deliberately process a document again, create a new workflow run. Its versions may start at 1 because comparisons and deduplication are scoped to the run. Replaying an existing run preserves the identity of its original work.
+
 ## Indexes for service views
 
 A global secondary index (GSI) provides another way to query the same items. Add these derived attributes to active current-state items:

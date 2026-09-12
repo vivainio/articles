@@ -65,6 +65,22 @@ status: waiting for approval
 
 That makes a useful operational question easy to answer: “Who owes the next action, and how long have they been waiting?”
 
+## Versioning transitions for replay
+
+Give each accepted transition a new version within the document's workflow run:
+
+```text
+invoice-42: version 1 → DocumentUploaded      → extraction
+invoice-42: version 2 → DocumentClassifiable  → classification
+invoice-42: version 3 → DocumentClassified    → routing
+```
+
+The handoff API assigns the version and includes it in the outgoing event. A retry or replay keeps that event's original version and application event ID. This is a workflow sequence number; a separate schema version would describe the event's data format.
+
+[EventBridge replay](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-replay-archived-event.html) can redeliver archived events, for example after a subscriber outage. Consumers can use the original identities to recognize work they have already completed. Replaying version 2 should not classify the document twice or move its tracked state backwards.
+
+Versioning supports that protection, but each consumer must enforce it. A tracker showing the latest state can ignore older snapshots; a worker needs a durable record of completed work before skipping a duplicate. The [tracker follow-up](document-pipeline-workflow-tracker.md#transition-versions-and-replay) explains those checks and how to handle events arriving out of order.
+
 ## Seeing the workflow as a whole
 
 A **workflow tracker** can query the shared records to show where each document is and how much work each service owns:
