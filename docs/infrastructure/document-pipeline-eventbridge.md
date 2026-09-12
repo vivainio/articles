@@ -47,7 +47,7 @@ emit("DocumentClassifiable", documentId="invoice-42",
      sender="extraction", nextOwner="classification")
 ```
 
-These are conceptual calls. `emit` is our application's handoff API, built around EventBridge.
+These are conceptual calls. `emit` is our application's handoff API, built around EventBridge. A small client wrapper could invoke a Lambda synchronously, returning an acceptance receipt or raising an ownership/version error before the calling service proceeds. The follow-up compares [implementation options for `emit`](document-pipeline-workflow-tracker.md#implementing-emit).
 
 `sender` identifies the service making the handoff; `nextOwner` says who should take over. The handoff API verifies the sender against the authenticated caller and checks that it matches the document's recorded current owner. It also checks that the requested transition is allowed. If classification tries to advance a document still owned by extraction, the API rejects the handoff and reports an ownership mismatch. Ownership stays with extraction.
 

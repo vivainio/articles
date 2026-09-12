@@ -40,6 +40,61 @@ Record the state change and an outgoing event intent together, then publish the 
 
 A separate tracker could instead subscribe through EventBridge and SQS and build its own view. That adds projection delay and requires handling duplicate and out-of-order events. Reading the existing accepted state is the simpler starting point for this concept.
 
+## Implementing emit
+
+The `emit` contract needs to accept or reject a handoff reliably. Several implementations can provide that contract:
+
+| Implementation | Immediate validation result? | Main tradeoff |
+|---|---|---|
+| Direct synchronous Lambda invocation | Yes | Simple for services already using AWS SDKs |
+| HTTP API backed by Lambda | Yes | Convenient across platforms; adds an API layer |
+| Shared library writing to DynamoDB | Yes | Distributes database permissions and transition logic across services |
+| SQS or EventBridge submission to a handler | No | Submission succeeds before validation; rejection needs a separate response path |
+
+An HTTP implementation could return structured errors with status codes such as `409 Conflict` for an ownership or version mismatch. API Gateway's [Lambda proxy integration](https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html) lets the handler specify the HTTP response.
+
+For this concept, a small client wrapper around **synchronous Lambda invocation** is a useful starting point. The service waits for the acceptance result before treating its handoff as complete:
+
+```text
+Service calls emit(...)
+  → synchronously invoke handoff Lambda
+  → check for an existing receipt for this request
+  → validate sender and requested transition
+  → transaction: check owner/version, update state,
+                 write history, counters, receipt, and outbox
+  ← acceptance receipt or rejection
+
+Outbox publisher → EventBridge → next service
+```
+
+Owner and version checks remain conditions inside the transaction, so concurrent calls cannot both advance the same state version. A successful response means the handoff is durably accepted. EventBridge publication and the next service's work happen afterward.
+
+### Turning rejection into a caller exception
+
+Lambda's synchronous `RequestResponse` invocation returns the function's result. A function error can arrive with HTTP status 200 and a `FunctionError` indicator, so the client wrapper must inspect the response rather than relying only on SDK exceptions. See [Lambda Invoke](https://docs.aws.amazon.com/lambda/latest/api/API_Invoke.html).
+
+Expected validation failures can use structured results that `emit` translates into local exceptions:
+
+```text
+Handoff Lambda returns:  rejected, code=OwnershipMismatch
+Client emit() raises:    OwnershipMismatch
+
+Handoff Lambda returns:  accepted, version=8, receipt=...
+Client emit() returns:   acceptance receipt
+```
+
+The wrapper also handles `FunctionError` responses and invocation failures. This gives callers a normal function-call interface while keeping the shared acceptance logic in one place.
+
+A known ownership or version rejection means this handoff did not change state. A timeout or broken connection leaves the outcome uncertain: the transaction may already have committed. Retry the identical request with the same application event ID to recover its original receipt. Do not generate a new event ID for that retry.
+
+### Binding sender to the caller
+
+The `sender` field expresses which service claims to be handing off. Permission to invoke a shared Lambda does not by itself prove that this field names the caller correctly.
+
+The implementation needs a trusted binding between caller identity and logical service name. For example, an authenticated HTTP entry point can map its verified principal to a service identity. A direct-invocation design could use a separate IAM-restricted entry function for each service; that function supplies the fixed sender identity to the shared acceptance handler. Restrict access to the shared handler accordingly.
+
+Whichever entry point is used, establish the sender identity before comparing it with the stored owner. The owner/version check then determines whether that service is allowed to advance this particular document.
+
 ## Start with the questions
 
 | Question | Read path |
