@@ -46,6 +46,10 @@ understand.](infrastructure/index.md)
 
 ## Latest notes
 
+- [Document Processing Pipeline with EventBridge Choreography](infrastructure/document-pipeline-eventbridge.md) —
+  explicit service ownership, reliable event handoffs, and queryable progress.
+- [Document Processing Pipeline with Lambda Durable Functions](infrastructure/document-pipeline-durable-functions.md) —
+  checkpointed orchestration in code, with parallel OCR and human review.
 - [Herdr Tutorial](terminal/herdr.md) — a terminal workspace manager with
   first-class awareness of coding agents.
 - [What Cloudflare's Free Tier Gives Vibe Coders](building/cloudflare-free-tier.md) —
