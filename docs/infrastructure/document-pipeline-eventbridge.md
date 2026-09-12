@@ -2,13 +2,11 @@
 
 *2026-09-12*
 
-The [durable-functions version](document-pipeline-durable-functions.md) puts one execution in charge of the document's whole journey. This design distributes that responsibility across services: extraction, classification, review, and finalization each own their part of the process. EventBridge connects them, and a shared `emit(...)` API records accepted transitions and arranges delivery.
+The [durable-functions version](document-pipeline-durable-functions.md) gives one execution responsibility for the whole document pipeline. Here, extraction, classification, review, and finalization each own their stage. EventBridge connects them; a shared orchestrator API, `emit(...)`, records transitions and arranges delivery.
 
 The central invariant is **one owner for the document's next required action**. Completing a stage means handing responsibility to the next service. The owner is explicit in the event and in DynamoDB, so an operator can ask "who owes the next action, and since when?" without reconstructing the event history.
 
-There is still business logic with an owner. Extraction owns page completion, review owns decisions and deadlines, and routing policy determines the next service. What disappears is the requirement for one execution to drive every stage from beginning to end.
-
-## Emitting releases ownership
+## A handoff transfers ownership
 
 A stage hands off through one interface. The examples below are conceptual pseudocode, not AWS SDK calls:
 
@@ -26,15 +24,15 @@ emit(
 )
 ```
 
-**Ownership transfers when `emit` durably accepts the handoff.** Attempting an HTTP call or placing an event in process memory does not release it. After acceptance, the new owner is responsible even if its work is still queued. The delivery infrastructure is responsible for getting the accepted assignment to that service.
+**Ownership transfers when `emit` durably accepts the handoff.** Until then, the sender remains responsible. After acceptance, the new owner is responsible even while its work is queued; the delivery infrastructure must deliver the assignment.
 
-A lost response leaves the producer uncertain, so it retries with the same event ID and contents. `emit` returns the original acceptance receipt rather than creating another transition. A reused event ID with different contents is an error. The producer must retain its completion intent durably or be able to reconstruct it from a redelivered task; a local variable is not a retry mechanism.
+If the response is lost, retry with the same event ID and contents. `emit` returns the original receipt; reusing the ID with different contents is an error. The producer must store its completion intent durably or reconstruct it from a redelivered task.
 
-Passing `owner` explicitly means the producer knows its next destination. That is a deliberate coupling. If routing should change independently, a routing service chooses the owner, or the acceptance API resolves it from versioned routing policy. Resolve and persist that choice once, before publication.
+An explicit `owner` couples the producer to its destination. For independent routing, a routing service or versioned policy can choose the owner instead. Persist that choice before publication. The example above chooses review directly; the pipeline table below uses a routing service.
 
-The API derives the sender service from the authenticated caller, or verifies an explicit `sender` against that identity. For a handoff, it checks that the current document owner equals `sender`, that `expectedOwnershipVersion` matches, and that the sender may request the proposed transition. A caller cannot acquire authority merely by naming the current owner. The owner and version checks are transaction preconditions, so a concurrent handoff cannot invalidate them between validation and commit.
+The emitter declares `sender` as a logical service name, regardless of where it runs. The API checks the current owner against `sender`, checks `expectedOwnershipVersion`, and validates the transition. These are workflow consistency checks, not authentication. Owner and version checks run inside the transaction.
 
-Keep the version even with the sender check: ownership can move from A to B and back to A. An old completion from A must not release A's new assignment. An authenticated retry of an already accepted event returns its original receipt before checking current ownership; otherwise a successful handoff with a lost response would incorrectly fail on retry.
+The version prevents an old completion from A releasing a new assignment after ownership moves A → B → A. Check for an existing receipt before checking ownership, so retries still succeed after a completed handoff.
 
 ## Handoffs and broadcasts
 
@@ -51,13 +49,13 @@ A handoff assigns one next owner. Other subscribers can observe the same event w
 | `DocumentRejected` / `ReviewExpired` | disposition | Record the outcome and apply archive policy |
 | `DocumentFinalized` / `DocumentArchived` | none | Terminal; observers may still react |
 
-An ingestion adapter translates the S3 notification into `DocumentUploaded`. Splitting produces `PageReady` events, not another `DocumentUploaded`.
+An ingestion adapter creates the initial assignment from the S3 notification; this creation transition has no previous owner. Splitting then produces `PageReady` events.
 
-For fan-out, extraction retains document ownership while workers receive individually owned page tasks. For a page completion, validate the sender and version against the page task assignment. Page completion changes that task's state; it does not overwrite the document owner. This also accommodates optional work such as indexing: either it is required before the next handoff, or it has its own responsibility and lifecycle outside the document's main path.
+During fan-out, extraction owns the document and workers own page tasks. Validate each page completion against its task owner and version. Optional work such as indexing has a separate lifecycle unless the next document handoff requires its result.
 
 ## What `emit` guarantees
 
-A recording Lambda is a convenient schema boundary, but its invocations run concurrently. Reliability comes from transactions and conditional writes, not from having one function name.
+The shared API owns the event schema. Its handlers can run concurrently, so acceptance requires transactions and conditional writes.
 
 For each accepted transition, atomically persist:
 
@@ -68,8 +66,8 @@ For each accepted transition, atomically persist:
 
 ```text
 accept(request):
-    sender = authenticate_sender_and_authorize(request)
-    require_claimed_sender_matches_identity(request, sender)
+    sender = request.sender
+    validate_event_schema(request)
     if receipt_exists(request.eventId):
         return receipt_if_same_contents(request)
     state = load_relevant_state(request)
@@ -85,13 +83,13 @@ accept(request):
     return acceptance_receipt
 ```
 
-Concurrent changes can invalidate the transaction. Reload and reevaluate rather than applying a decision based on stale state. Ignored reports, such as a late expiry after approval, may be recorded with that disposition; they never change the accepted business state.
+On a transaction conflict, reload state and reevaluate. Record ignored reports, such as expiry after approval, without changing business state.
 
 A publisher reads the outbox and calls EventBridge. It handles individual `PutEvents` entry failures and marks only successful entries as published. If it crashes after publication but before recording success, it publishes again with the same application event ID. Consumers must tolerate that duplicate.
 
-This is the [transactional outbox pattern](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html). It closes the gap where a gate commits but its output disappears before publication. EventBridge acceptance is also not proof that the required worker completed: target delivery failures and worker failures need their own retry and repair paths.
+This [transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html) prevents a committed transition from losing its outgoing event. Publication confirms bus acceptance, not worker completion; delivery and worker failures still need recovery.
 
-Keep each transaction bounded. A large page manifest should be stored immutably, then expanded into deterministic page assignments in resumable batches. A durable dispatch intent ensures that a crash halfway through expansion does not lose the remaining pages.
+Keep transactions bounded: store large manifests immutably and create deterministic page assignments in resumable batches. Persist the dispatch intent so a crash cannot lose undispatched pages.
 
 ## Tracking ownership in DynamoDB
 
@@ -107,13 +105,25 @@ dueAt: ...
 reviewRequestId: ...
 ```
 
-`owner` describes responsibility; `status` describes progress. A service can own queued work before any worker starts. Transfer increments `ownershipVersion`; later completions must match the assignment they were issued. Use additional state revisions where concurrent updates within an assignment need protection.
+`owner` describes responsibility; `status` describes progress. Use separate state revisions to protect concurrent updates within an assignment.
 
-Document identity and processing identity differ. Replacing a file or deliberately reprocessing it starts a new `processingRunId`. Page deduplication includes the run and page identity; review decisions include the review request. An old completion cannot advance a new run. Pin the source object version and processing policy or model version so results have a defined provenance.
+Each assignment event carries `ownershipVersion`. The receiver copies it unchanged into `expectedOwnershipVersion` on its next handoff. Services neither increment it nor need to query for it.
 
-The append-only history uses stable event identities, with timestamps as metadata. Timestamps alone neither guarantee unique keys nor establish causal order. Record accepted versions and causation IDs to explain transitions. Store large OCR results in S3 and retain immutable references in events.
+```text
+A receives an assignment with ownershipVersion: 12
+A → Emit(sender: A, expectedOwnershipVersion: 12, owner: B)
+Orchestrator → B: event with owner: B, ownershipVersion: 13
+B → Emit(sender: B, expectedOwnershipVersion: 13, owner: C)
+Orchestrator → C: event with owner: C, ownershipVersion: 14
+```
 
-Dashboard indexes can answer queries by tenant, owner, status, and due time. Plan index partitioning for concentrated workloads; distributing base-table keys by document does not automatically distribute an index keyed only by a common status. Dashboards may tolerate stale projections, but transition preconditions use authoritative state.
+The orchestrator atomically checks and increments the version when accepting a handoff, storing it in the assignment and outgoing event. Publication retries and reports without a handoff keep the version unchanged. File and page assignments follow the same rule with task versions.
+
+Replacing a file or reprocessing a document starts a new `processingRunId`. Scope page deduplication to the run and page, and review decisions to the review request, so old completions cannot advance new work. Pin source object and policy/model versions to identify what produced each result.
+
+Key history by stable event identities. Record versions and causation IDs for ordering; timestamps alone are insufficient. Keep large OCR results in S3 and immutable references in events.
+
+Index dashboard queries by tenant, owner, status, and due time. Avoid concentrating traffic on a common status key. Dashboards may use eventually consistent projections; transitions check authoritative state.
 
 EventBridge [archives and replay](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-replay-archived-event.html) can help recover published events. The application history additionally records acceptance, ignored reports, and ownership decisions; a bus archive does not replace that record.
 
@@ -121,7 +131,7 @@ EventBridge [archives and replay](https://docs.aws.amazon.com/eventbridge/latest
 
 Before dispatch, extraction fixes an immutable manifest of expected page identities. Each page result must belong to that manifest and processing run. Recording a previously unseen successful result and incrementing the completion count happen atomically. Exactly one accepted join transition creates the `DocumentClassifiable` outgoing intent and transfers ownership.
 
-Define failure as well as success: this pipeline sends a permanently failed page to extraction intervention and retains extraction ownership until the page is retried or the document is explicitly rejected. A missing page has a deadline and appears in the repair queue; it cannot leave the document silently waiting forever. Partial classification could be a separate, explicit policy.
+Extraction retains ownership when a page fails permanently, until intervention retries it or rejects the document. Missing pages have deadlines and enter the repair queue. Processing partial results requires an explicit policy.
 
 A durable execution can implement extraction internally if it owns dispatch and collection. A `context.map` that starts OCR is not a drop-in replacement for a passive gate receiving independently dispatched results; changing between them changes who owns the work.
 
@@ -129,15 +139,15 @@ There may be no reason to split at all. Textract's [asynchronous multipage proce
 
 ## Reviews, deadlines, and authorization
 
-The review service owns the document while a person decides. A human response is a request to that service; the accepted business event follows validation. The review service emits the handoff as `sender="review"`; record the human actor separately for audit. Similarly, optional observers submit reports or requests without transferring document ownership. Initial ingestion is an explicitly authorized creation transition, since no previous owner exists.
+The review service owns the document while a person decides. It validates the response and emits the handoff as `sender="review"`, recording the human actor separately for audit.
 
-The approval endpoint binds authorization to the tenant, document run, review request, permitted action, and expiry. An unguessable document ID is not authorization. A signed link may open the review UI; an explicit authenticated or token-authorized submission records the decision.
+The approval endpoint binds authorization to the tenant, run, review request, action, and expiry. A signed link opens the UI; an explicit authorized submission records the decision.
 
 Approval requires a pending review and a server-side deadline check. Here, a decision must pass that check during acceptance processing; a client-provided timestamp does not establish timely approval. Concurrent approval and expiry use conditional transitions on the same review state. If the business instead requires an exact durable receipt cutoff, persist receipt time and arbitrate from that record explicitly.
 
-Entering review also persists an intent to create a one-time EventBridge Scheduler schedule. A retryable dispatcher creates it using a stable schedule identity. The schedule requests expiry for that specific review; it does not itself decide the outcome. If delivered late, it cannot make a late approval valid. If approval has already won, expiry is ignored.
+Entering review persists a scheduling intent. A retryable dispatcher creates a one-time EventBridge Scheduler schedule with a stable identity. It requests expiry for that review; the review service decides the outcome. Late delivery cannot extend the approval deadline or overturn an accepted approval.
 
-Cancellation after a decision and deletion of completed schedules keep resources tidy. A reconciler also checks overdue reviews, covering failed schedule creation or exhausted delivery retries. Scheduling is part of the durable handoff design, not an untracked side effect after it.
+Cancel schedules after decisions and delete completed schedules. A reconciler checks overdue reviews to cover failed schedule creation or exhausted delivery retries.
 
 ## Preserve event meaning on retries
 
@@ -147,7 +157,7 @@ Use a common envelope:
 eventId, eventType, schemaVersion
 tenantId, documentId, processingRunId
 causationId, occurredAt
-sender                        # verified service identity, recorded by emit
+sender                        # declared logical service name
 owner, ownershipVersion       # document assignment, where relevant
 taskId, taskVersion           # separately scoped work, where relevant
 payload / immutable artifact references
@@ -159,13 +169,11 @@ A transport retry keeps the original event identity and meaning. Intentional rep
 
 ## Backpressure and idempotent workers
 
-An SQS queue between the `PageReady` rule and OCR buffers bursts. Set event-source concurrency and function capacity deliberately, and account for batch size and parallel calls within each worker. Concurrency bounds in-flight work; they are not a requests-per-second guarantee. Shared OCR quotas may need a rate limiter and retry backoff across all documents and tenants.
-
-Likewise, a durable map's per-document concurrency bound does not protect an account-wide downstream quota. Both designs need capacity planning beyond their local fan-out mechanism.
+An SQS queue between the `PageReady` rule and OCR buffers bursts. Set event-source concurrency and function capacity deliberately, and account for batch size and parallel calls within each worker. Concurrency limits bound in-flight work, not requests per second. Shared OCR quotas may need a rate limiter and retry backoff across all documents and tenants.
 
 Every required consumer handles duplicates, including those on a linear path. A forwarding stage can reproduce a downstream side effect even if it changes no gate state. Workers persist or reconstruct a stable task outcome and completion event, and acknowledge queue messages only after the required completion acceptance succeeds. If a crash occurs between an external side effect and its result record, use the downstream service's idempotency mechanism or reconcile the result before repeating it.
 
-An ownership version fences stale coordination writes. It does not automatically cancel an old worker or prevent its external writes; those effects need their own run/version checks or idempotency keys.
+Ownership versions reject stale coordination writes. External writes need their own run/version checks or idempotency keys; transferring ownership does not stop an old worker.
 
 ## Recovery is part of the model
 
@@ -177,12 +185,12 @@ Track business age separately from delivery health: a review can legitimately wa
 
 ## Scaling and the tradeoff
 
-A waiting document has no durable Lambda execution, but it still has managed state: coordination and history items, possibly an outbox backlog, and a schedule for a pending review. [Scheduler quotas](https://docs.aws.amazon.com/scheduler/latest/UserGuide/scheduler-quotas.html) cover schedule count, creation rate, and invocation throughput. This is not unlimited concurrency without resources.
+A waiting document has no durable Lambda execution, but it still has managed state: coordination and history items, possibly an outbox backlog, and a schedule for a pending review. [Scheduler quotas](https://docs.aws.amazon.com/scheduler/latest/UserGuide/scheduler-quotas.html) cover schedule count, creation rate, and invocation throughput.
 
 Current [Lambda quotas](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html) list 5 million running durable executions per Region, or 10 million in the specified higher-quota Regions, with increases available. The 3,000-operation and 100 MB cumulative persisted-payload limits are per execution. Quotas change; verify the deployment Region rather than choosing choreography to escape a particular historical number.
 
 Size either design using arrival rate, pages per document, review fraction and duration, burst size, and downstream throughput. At steady state, pending reviews are roughly the review arrival rate multiplied by average review duration. One million documents per day says much less about capacity than those quantities do.
 
-The stronger case for EventBridge is independent evolution: services own bounded processes, observers subscribe without changing those processes, and explicit assignments expose responsibility across the whole system. The shared acceptance contract makes consistency and recovery reusable instead of asking every stage to invent them.
+EventBridge supports independent evolution: services own their processes, observers subscribe without changing them, and assignments expose responsibility. The shared acceptance contract makes consistency and recovery reusable.
 
-The cost is operating that contract: transactions, an outbox, consumer idempotency, scheduling, and reconciliation. Durable functions can still simplify a service's internal work. Use them inside extraction or another bounded stage when useful, while keeping document handoffs and independent subscriptions on EventBridge. The result is a pipeline whose ownership is distributed, explicit, and queryable.
+The cost is operating transactions, an outbox, consumer idempotency, scheduling, and reconciliation. Durable functions can still simplify work inside a stage, while EventBridge connects document handoffs and independent subscribers.
