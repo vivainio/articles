@@ -6,6 +6,8 @@ The [durable-functions version](document-pipeline-durable-functions.md) of this 
 
 What they share is how a stage reports that it's done: one call, `emit(eventType, docId, ...fields)`. A stage never touches DynamoDB or EventBridge itself — `emit` is the entire interface between a stage and the rest of the system.
 
+Worth separating two reasons the orchestrator exists, because they don't kick in at the same time. The audit log and the "everything currently pending-review" dashboard are worth having from the very first two events — even a `DocumentReadyForOcr` → `DocumentOcrDone` flow with no fan-in and nothing to race benefits from every transition being recorded somewhere queryable, and that's true regardless of how simple the flow is. The gate logic — fan-in counters, race resolution — only shows up once a flow actually has a join or two triggers competing for the same outcome; for a plain linear chain, `gate` is just a passthrough and the orchestrator is doing nothing but logging and re-publishing.
+
 ## The pipeline as events
 
 | event | emitted by | consumed by |
