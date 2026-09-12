@@ -73,6 +73,8 @@ gate(DocumentApproved | ReviewTimedOut, docId, fields):
 
 Everywhere else, `gate` just re-yields its input unchanged — the orchestrator's log-and-publish wrapper still runs, but nothing contends on shared state.
 
+The DynamoDB counter and conditional write above are one way to implement these two gates, not the definition of the pattern — from outside, a gate is still just event(s) in, event(s) out, and nothing downstream needs to know what happened inside it. A durable execution works just as well as the internals of either: the fan-in gate could be one execution per document (`executionName=docId`) whose whole body is `context.map(ocr_step, pages, config=MapConfig(max_concurrency=5))`, letting the platform's checkpointing stand in for `incr_counter`; the race gate could be an execution that does nothing but `context.wait_for_callback(timeout=...)` and returns whichever came first, letting the runtime resolve the race instead of a conditional write. Either way it's one stage's implementation detail, the same way "call Textract" is — it doesn't make this "a durable-functions pipeline with EventBridge wrapped around it," any more than a stage calling DynamoDB makes the whole thing "a DynamoDB pipeline."
+
 ## The log doubles as the audit trail
 
 EventBridge itself keeps no memory of a document's path once an event's delivered, so `log` is the only history that exists:
