@@ -93,7 +93,25 @@ except ClientError as e:
         return  # already decided by the other trigger
 ```
 
-Both cases reduce to the same thing: a join or a race needs exactly one piece of shared, checkable state per document, touched only by the handlers actually contending on it. Everywhere else, keep the linear event-to-subscriber shape.
+Both cases reduce to the same thing: a join or a race needs exactly one piece of shared, checkable state per document, contended among only the handlers actually racing on it. Everywhere else, keep the linear event-to-subscriber shape.
+
+## The audit log and current-state query
+
+The fan-in counter and the race check are the only places that need *contended* writes, but DynamoDB has a second, unconditional job here: every handler in the chain also appends a record of the event it just processed, because there's no other source of "what happened to this document, in order." Durable functions get execution history from the platform for free; EventBridge doesn't keep any memory of a document's path through the pipeline once each event has been delivered — the log is the only place that history exists at all, which makes it closer to required than the read-model in the durable article treated it.
+
+Same append-only shape as the durable version: `document_id` as partition key, `timestamp#detailType` as sort key, one immutable item per event, so independent handlers writing concurrently never race on the same item:
+
+```python
+def record_event(document_id, detail_type, payload):
+    table.put_item(Item={
+        "documentId": document_id,
+        "sortKey": f"{int(time.time() * 1000)}#{detail_type}",
+        "detailType": detail_type,
+        "payload": payload,
+    })
+```
+
+Every handler calls this alongside whatever it's already doing — the OCR Lambda records `PageExtracted` in the same breath as it emits the event, the approval Function URL records `DocumentApproved` alongside its `PutEvents` call. That answers "what happened to document X" as a query over one partition key. It doesn't answer "show me everything currently `pending-review`" cheaply — that needs knowing no *later* event exists for each document, which a log alone can't tell you without a scan. The fix is the same current-state projection as before: the same `record_event` call also upserts a second item, `document_id` → `currentStage`, `updatedAt`, with a GSI on `currentStage`, giving the dashboard query without touching the log's shape.
 
 ## Waits and timeouts without a wait primitive
 
@@ -170,4 +188,4 @@ catching the conditional-check failure as "already counted, ignore." Every handl
 
 Choreography wins when the stages genuinely belong to different teams or services that shouldn't need to touch a shared orchestrator to add a new subscriber — anyone can listen for `DocumentClassified` without coordinating with whoever owns the pipeline. It's also the natural fit if some of those stages already publish EventBridge events for other reasons; there's no separate integration layer to build.
 
-It loses on everything the durable-execution runtime was doing for free: no checkpointing, no execution history to inspect when a document gets stuck, no built-in wait, no bounded fan-out, no dedup. All five had to be rebuilt here with DynamoDB, EventBridge Scheduler, SQS, and conditional writes — each one small, but each one now code you own and can get wrong. For a pipeline with one real owner and no reason for arbitrary other services to hook into the middle of it, that's a worse trade than a single durable function. It's the right shape specifically when "who else needs to react to this event" is a real, growing question.
+It loses on everything the durable-execution runtime was doing for free: no checkpointing, no built-in wait, no bounded fan-out, no dedup, and — unlike the durable version, where the DynamoDB log was an optional dashboard convenience — no execution history unless you build the audit-log table above yourself, since here it's the *only* record of a document's path, not a nice-to-have alongside one the platform already gives you. All five had to be rebuilt here with DynamoDB, EventBridge Scheduler, SQS, and conditional writes — each one small, but each one now code you own and can get wrong. For a pipeline with one real owner and no reason for arbitrary other services to hook into the middle of it, that's a worse trade than a single durable function. It's the right shape specifically when "who else needs to react to this event" is a real, growing question.
