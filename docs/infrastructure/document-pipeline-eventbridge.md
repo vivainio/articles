@@ -53,6 +53,8 @@ Ownership is optional and applies where the workflow needs a controlled handoff.
 
 A service does not always need to know what happens next. It can publish an event describing the work it completed, and configured subscribers can react to that result. Multiple services may react independently; any required ordering or coordination must be defined by the application.
 
+Coordination is distributed in this model. A component can explicitly hand responsibility to a known next owner, or publish a completion event without specifying an owner and let interested handlers react. The workflow then emerges from the services’ event contracts and subscription rules.
+
 `nextOwner` therefore supports explicit handoffs where needed, while completion events also support flows without a designated owner. The examples below use strict ownership.
 
 `sender` identifies the service making the handoff; `nextOwner` says who should take over. The handoff API verifies the sender against the authenticated caller and checks that it matches the document's recorded current owner. It also checks that the requested transition is allowed. If classification tries to advance a document still owned by extraction, the API rejects the handoff and reports an ownership mismatch. Ownership stays with extraction.
