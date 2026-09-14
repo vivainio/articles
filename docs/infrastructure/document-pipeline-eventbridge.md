@@ -49,11 +49,17 @@ emit("DocumentClassifiable", documentId="invoice-42",
 
 These are conceptual calls. `emit` is our application's handoff API, built around EventBridge. A small client wrapper could invoke a Lambda synchronously, returning an acceptance receipt or raising an ownership/version error before the calling service proceeds. The follow-up compares [implementation options for `emit`](document-pipeline-workflow-tracker.md#implementing-emit).
 
+Ownership is optional and applies where the workflow needs a controlled handoff. In a strict ownership flow, the application records the responsible service and validates its handoffs. In an unowned flow, the owner is `null` and ownership checks do not apply. Authentication and other applicable validation still apply.
+
+A service does not always need to know what happens next. It can publish an event describing the work it completed, and configured subscribers can react to that result. Multiple services may react independently; any required ordering or coordination must be defined by the application.
+
+`nextOwner` therefore supports explicit handoffs where needed, while completion events also support flows without a designated owner. The examples below use strict ownership.
+
 `sender` identifies the service making the handoff; `nextOwner` says who should take over. The handoff API verifies the sender against the authenticated caller and checks that it matches the document's recorded current owner. It also checks that the requested transition is allowed. If classification tries to advance a document still owned by extraction, the API rejects the handoff and reports an ownership mismatch. Ownership stays with extraction.
 
 `DocumentUploaded` creates the initial assignment, so it has no previous owner to check. The API verifies that the upload service is allowed to start the workflow and that it is not replacing an existing assignment.
 
-The key idea is **one owner for the document's next required action**. After upload, extraction owes the next action. After extraction, classification does. The handoff records who is responsible next and arranges delivery of the event.
+For a strict ownership flow, **one service owns the document's next required action**. After upload, extraction owes the next action. After extraction, classification does. The handoff records who is responsible next and arranges delivery of the event.
 
 EventBridge routes events; the application keeps track of responsibility. A shared record in a database such as DynamoDB could show:
 
@@ -120,7 +126,7 @@ Each service handles its own part of the process: review understands approval, a
 
 ## Other services can listen too
 
-An event can have several listeners while only one service owns the next pipeline action.
+An event can have several listeners. In a strict ownership flow, only one service owns the next pipeline action; in an unowned flow, there is no designated owner.
 
 For example, `DocumentApproved` could also update a dashboard, notify the uploader, or feed analytics. Those subscribers react independently. Adding an analytics subscriber does not require changing the review service.
 
