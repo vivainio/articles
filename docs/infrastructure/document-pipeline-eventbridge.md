@@ -122,7 +122,18 @@ emit("DocumentApproved", documentId="invoice-42",
      sender="review", nextOwner="finalization")
 ```
 
-Finalization stores the approved document and announces `DocumentFinalized`. The pipeline is complete, so there is no next owner.
+Finalization stores the approved document and explicitly ends the workflow run:
+
+```text
+emit("DocumentFinalized", documentId="invoice-42",
+     sender="finalization", nextOwner=None, final=True)
+```
+
+`final=True` means this workflow run has ended. The event type conveys what happened: `DocumentFinalized`, `DocumentRejected`, or `DocumentCancelled` could each end a run where the workflow contract allows it. No separate outcome field is needed. Omitting `final` means `False`; having no next owner alone does not imply completion, because unowned flows can still have work to do.
+
+The handoff API validates that the caller and transition may end the run and rejects `final=True` with a next owner. On acceptance, it records the completion time, clears ownership and deadlines, and removes the run from active and overdue tracking. Completion also starts the configured cleanup retention period. It does not trigger immediate deletion: subscribers may still need the data, and history and deduplication receipts must remain available for the supported replay period.
+
+An overdue handler must recheck the current run state and version before acting, so a queued timer cannot escalate work that has already ended. Accepted final transitions close the run to further changes; retries return the original receipt, and deliberate reprocessing starts a new run. The [tracker follow-up](document-pipeline-workflow-tracker.md#ending-a-workflow-run) describes how this affects stored state and cleanup.
 
 Each service handles its own part of the process: review understands approval, and finalization understands storage. They share a small contract for events and handoffs.
 

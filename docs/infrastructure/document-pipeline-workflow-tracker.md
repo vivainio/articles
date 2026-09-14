@@ -105,7 +105,17 @@ Whichever entry point is used, establish the sender identity before comparing it
 | How many documents belong to each service? | Read service counter items |
 | How did this document get here? | Query its history items |
 
-A stage is represented by `owner`; `status` describes progress within that stage. For example, review could have `waiting-for-approval` or `decision-recorded`. A completed document has a terminal status and no active owner.
+A stage is represented by `owner`; `status` describes progress within that stage. For example, review could have `waiting-for-approval` or `decision-recorded`. A run ends when `emit` accepts an event with `final=True`; its state then has a terminal status and no active owner. No owner alone does not mean the run has ended.
+
+### Ending a workflow run
+
+`final` defaults to `False`. The event type conveys what happened; for example, `DocumentFinalized` or `DocumentRejected` can end a run without a separate outcome field. The API validates the caller, expected version, and allowed terminal transition, and rejects a final event that specifies a next owner.
+
+Accept the final transition through the same transaction as other handoffs: persist `final=True` and `completedAt` in current state, clear ownership and `dueAt`, remove owner and deadline index keys, update the previous owner's count where maintained, and record the history, acceptance receipt, and outbox intent. Include `final` in the outgoing event so subscribers can recognize the end of the run.
+
+Overdue handlers must check current state and version before acting, with a conditional transition when recording an escalation. This prevents stale index results or already queued timers from escalating a closed run. Further state changes to that run are rejected; an identical retry of the final event returns its original receipt. Deliberate reprocessing uses a new run identity.
+
+Use `completedAt` to start the configured cleanup retention period. Finality does not mean every independent subscriber has finished, so retain data they still need. Preserve history and deduplication receipts for the supported replay period, and retain enough closed-run state to reject late transitions for as long as old deliveries are accepted.
 
 ## A possible DynamoDB table
 
