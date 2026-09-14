@@ -157,7 +157,19 @@ Suppose an invoice arrives with `owner = null`. Both enrichment and validation s
 
 For this case, assign the invoice to a processing stage that coordinates both operations. An AWS Lambda durable function can run the branches and wait for their results using its parallel operations. See [AWS's workflow orchestration guidance](https://docs.aws.amazon.com/lambda/latest/dg/with-step-functions.html).
 
-The **durable workflow is the logical owner** during this stage: it owes completion of the combined work and the eventual handoff. The ownership record could use `owner = invoice-processing` as the workflow's stable identity, bound to its authenticated service identity for `emit`. A particular durable execution holds the processing claim. Enrichment and validation participate in the work without becoming owners; the workflow's final handoff step transfers ownership onward.
+The **durable workflow is the logical owner** during this stage: it owes completion of the combined work and the eventual handoff. The ownership record could use `owner = invoice-processing` as the workflow's stable identity, bound to its authenticated service identity for `emit`. One named durable execution coordinates each invoice workflow run. Enrichment and validation participate in the work without becoming owners; the workflow's final handoff step transfers ownership onward.
+
+Start that execution through a small dispatcher Lambda:
+
+```text
+EventBridge → SQS → Dispatcher Lambda
+                     → Start durable execution
+                       name: invoice-processing-invoice42-run1
+```
+
+SQS delivery can repeat, and a direct Lambda event source mapping can start another durable execution on retry. The dispatcher instead supplies a stable `DurableExecutionName` when invoking the durable function, using the same name and identical business payload for repeated deliveries. Include workflow and invoice/run identity in the name, scoped by tenant where applicable; exclude changing delivery metadata from the payload. Lambda uses the name to deduplicate execution starts within its retention period. Deliberate reprocessing uses a new run identity; deliveries beyond that retention period need a durable completed-run check. See [durable execution idempotency](https://docs.aws.amazon.com/lambda/latest/dg/durable-execution-idempotency.html).
+
+The dispatcher acknowledges the SQS message after the invocation is accepted. The durable workflow then handles processing retries and failures; successful dispatch does not mean invoice processing has finished.
 
 ```text
 Durable workflow owns the invoice
@@ -182,11 +194,13 @@ Durable workflow owns the invoice
 
 Both branches receive the same input snapshot and return proposed changes instead of independently overwriting the shared invoice. The durable workflow remains the owner throughout. Once both branches succeed, it combines their results and commits the content once. If both change the same field, the application needs an explicit merge rule or must reject the conflict; branch completion order should not decide the result.
 
-The content save must atomically check the expected content version and the current processing claim. If the invoice changed or the claim is no longer valid, reject the save and reconcile or recompute the results. Here, version N identifies the content snapshot; it is separate from the handoff sequence number unless the application explicitly keeps them together. DynamoDB supports [atomic conditional writes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/WorkingWithItems.html#WorkingWithItems.ConditionalUpdate) for this protection.
+The content save atomically checks the expected content version to prevent overwriting a changed invoice. If the version changed, reconcile or recompute the results. Here, version N identifies the content snapshot; it is separate from the handoff sequence number unless the application explicitly keeps them together. DynamoDB supports [atomic conditional writes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/WorkingWithItems.html#WorkingWithItems.ConditionalUpdate) for this protection.
 
 This is **fan-out/fan-in**: start independent work in parallel, then collect its results before continuing. It is appropriate only if validation can inspect the original invoice. If validation must check the enriched content, run `enrichment → validation` sequentially instead.
 
-Durable execution coordinates progress and recovery, but does not itself lock the invoice. The stage still needs an atomic worker claim to prevent duplicate deliveries from starting competing attempts, a recovery path for abandoned claims, and idempotent writes for retries. Commit the content before handing ownership onward, and make that handoff retryable; where they share a database, content, handoff state, and outbox intent can be committed in one transaction.
+With duplicate starts prevented and this workflow as the only writer during the stage, a separate worker claim and expiry mechanism is unnecessary. The orchestrator Lambda can also implement exclusive locks through DynamoDB conditional writes when multiple workflows or other writers must coordinate access to the same invoice. All writers must honor those locks, with recovery for abandoned locks and protection against stale holders. Such locking should not be needed in typical architectures with one durable execution per invoice run and explicit ownership between stages.
+
+Durable steps can still retry: a save might succeed before its completion is checkpointed. Give the save a stable operation ID and record its receipt atomically with the content update, so a retry recognizes its own successful write rather than treating it as a version conflict. Commit the content before handing ownership onward. If the handoff fails after the save, retry it with the same application event ID. Where they share a database, content, handoff state, and outbox intent can be committed in one transaction.
 
 In this example, ownership stays with the coordinating workflow while its internal operations run in parallel. An unowned event remains useful for independent subscribers such as analytics and notifications, but `owner = null` alone does not coordinate services that modify shared content.
 
