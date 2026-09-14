@@ -140,6 +140,43 @@ A service can use durable functions for its internal substeps, including paralle
 
 EventBridge connects the services; durable functions can organize the work within a service.
 
+## Example: enrichment and validation in parallel
+
+Suppose an invoice arrives with `owner = null`. Both enrichment and validation subscribe to its arrival event, and both want to modify its content. With ownership checks disabled, both could read the same invoice, modify their own copies, and save them. One save could overwrite the other's changes. EventBridge routes the event to both services; it does not lock the invoice or choose which service may write.
+
+For this case, assign the invoice to a processing stage that coordinates both operations. An AWS Lambda durable function can run the branches and wait for their results using its parallel operations. See [AWS's workflow orchestration guidance](https://docs.aws.amazon.com/lambda/latest/dg/with-step-functions.html).
+
+```text
+Processing stage owns the invoice
+                |
+       Read invoice version N
+                |
+         +------+------+
+         |             |
+     Enrichment    Validation
+     returns patch returns findings/patch
+         |             |
+         +------+------+
+                |
+          Wait for both
+                |
+     Merge results, resolve conflicts
+                |
+     Save once, conditional on version N
+                |
+       Hand off to the next stage
+```
+
+Both branches receive the same input snapshot and return proposed changes instead of independently overwriting the shared invoice. The processing stage remains the owner throughout. Once both branches succeed, it combines their results and commits the content once. If both change the same field, the application needs an explicit merge rule or must reject the conflict; branch completion order should not decide the result.
+
+The content save must atomically check the expected content version and the current processing claim. If the invoice changed or the claim is no longer valid, reject the save and reconcile or recompute the results. Here, version N identifies the content snapshot; it is separate from the handoff sequence number unless the application explicitly keeps them together. DynamoDB supports [atomic conditional writes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/WorkingWithItems.html#WorkingWithItems.ConditionalUpdate) for this protection.
+
+This is **fan-out/fan-in**: start independent work in parallel, then collect its results before continuing. It is appropriate only if validation can inspect the original invoice. If validation must check the enriched content, run `enrichment → validation` sequentially instead.
+
+Durable execution coordinates progress and recovery, but does not itself lock the invoice. The stage still needs an atomic worker claim to prevent duplicate deliveries from starting competing attempts, a recovery path for abandoned claims, and idempotent writes for retries. Commit the content before handing ownership onward, and make that handoff retryable; where they share a database, content, handoff state, and outbox intent can be committed in one transaction.
+
+In this example, ownership stays with one stage while its internal operations run in parallel. An unowned event remains useful for independent subscribers such as analytics and notifications, but `owner = null` alone does not coordinate services that modify shared content.
+
 ## What the approach buys us
 
 Services can evolve independently, new subscribers can react to existing events, and explicit ownership gives operators somewhere to start when a document gets stuck.
