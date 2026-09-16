@@ -37,17 +37,23 @@ For this concept, services publish through a shared API called `emit`. The uploa
 
 ```text
 emit("DocumentUploaded", documentId="invoice-42",
-     sender="upload", nextOwner="extraction")
+     sender="upload", nextOwner="extraction",
+     vendor="Acme Supplies", amount=1240.00, currency="USD")
 ```
 
 Once extraction has the document's text, it hands over to classification:
 
 ```text
 emit("DocumentClassifiable", documentId="invoice-42",
-     sender="extraction", nextOwner="classification")
+     sender="extraction", nextOwner="classification",
+     pageCount=3, extractedText="s3://docs/invoice-42/text.json")
 ```
 
+`documentId`, `sender`, and `nextOwner` are the handoff fields `emit` itself understands and validates. `vendor`, `amount`, `currency`, `pageCount`, and `extractedText` are ordinary application data along for the ride — EventBridge's `detail` payload is a JSON blob, not a fixed schema, so each event can carry whatever fields the next service needs, beyond the small set the handoff contract cares about.
+
 These are conceptual calls. `emit` is our application's handoff API, built around EventBridge. A small client wrapper could invoke a Lambda synchronously, returning an acceptance receipt or raising an ownership/version error before the calling service proceeds. The follow-up compares [implementation options for `emit`](document-pipeline-workflow-tracker.md#implementing-emit).
+
+Each `emit` call is billed as an EventBridge `PutEvents` request: roughly $1.00 per million custom events published to an event bus, with a payload split into 64 KB chunks each counted as a separate event. Replaying archived events is billed the same way, at the same rate. Delivering to an API destination adds a separate invocation charge, around $0.20 per million events, plus standard data transfer charges for calls that leave AWS. At typical document-processing volumes this is negligible, but it is worth keeping in mind if a stage's internal fan-out (as in the enrichment/validation example below) turns one handoff into many additional `emit` calls. See [EventBridge pricing](https://aws.amazon.com/eventbridge/pricing/) for current rates.
 
 Ownership is optional and applies where the workflow needs a controlled handoff. In a strict ownership flow, the application records the responsible service and validates its handoffs. In an unowned flow, the owner is `null` and ownership checks do not apply. Authentication and other applicable validation still apply.
 
@@ -110,7 +116,8 @@ Extraction finishes, and classification identifies the invoice as needing a pers
 
 ```text
 emit("ReviewRequested", documentId="invoice-42",
-     sender="routing", nextOwner="review")
+     sender="routing", nextOwner="review",
+     reason="lowConfidenceClassification", confidence=0.62)
 ```
 
 The review service now owns the next action. The document can wait there for hours or days while the person decides. An EventBridge Scheduler timer could prompt the service to handle an expired review.
@@ -119,14 +126,16 @@ When the person approves, review hands the document to finalization:
 
 ```text
 emit("DocumentApproved", documentId="invoice-42",
-     sender="review", nextOwner="finalization")
+     sender="review", nextOwner="finalization",
+     approvedBy="reviewer-217", note="Matches PO 88213")
 ```
 
 Finalization stores the approved document and explicitly ends the workflow run:
 
 ```text
 emit("DocumentFinalized", documentId="invoice-42",
-     sender="finalization", nextOwner=None, final=True)
+     sender="finalization", nextOwner=None, final=True,
+     archiveLocation="s3://invoices/2026/invoice-42.pdf")
 ```
 
 `final=True` means this workflow run has ended. The event type conveys what happened: `DocumentFinalized`, `DocumentRejected`, or `DocumentCancelled` could each end a run where the workflow contract allows it. No separate outcome field is needed. Omitting `final` means `False`; having no next owner alone does not imply completion, because unowned flows can still have work to do.
@@ -150,6 +159,10 @@ This is where the event bus becomes useful beyond moving a document from one sta
 A service can use durable functions for its internal substeps, including parallel work and collecting results. From the rest of the pipeline's perspective, it still receives an assignment and emits a completion event.
 
 EventBridge connects the services; durable functions can organize the work within a service.
+
+A stage sometimes needs to reach outside AWS entirely — for example, validation calling an external fraud-check API before deciding whether invoice-42 needs review. EventBridge supports this through an **API destination** target: a rule invokes the vendor's HTTPS endpoint directly, authorized through a **connection** that stores the API key, Basic, or OAuth credentials, with an optional rate limit and input transformer to shape the outgoing request. The API destination cannot call back into `emit`, though — the vendor has no relationship with your ownership record — so validation stays the logical owner throughout. A small Lambda invokes the API destination (or calls the vendor's API directly), waits for the response, and only that Lambda calls `emit("DocumentValidated", documentId="invoice-42", sender="validation", nextOwner="routing")` once the external result is in hand. See [API destinations](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-api-destinations.md).
+
+Choosing among several vendors calls for different mechanisms depending on how many there are. For a small, known set, add one rule per vendor, matching on a `detail` field such as `vendor: ["acme"]`, each pointing at its own API destination and connection; EventBridge picks the target by matching the pattern. For one API destination whose path varies by event, its target parameters accept JSON path syntax — for example, a path parameter of `$.detail.invoiceType` turns a single `https://api.example.com/*` destination into `.../invoices` or `.../receipts` as needed, though the substituted value must come from the raw event rather than from an input transformer. Neither approach fits a large or runtime-determined set of vendors, since each API destination and connection is a resource provisioned ahead of time; that case calls for a Lambda that looks up the target URL and credentials from an application-owned config store and makes the call itself.
 
 ## Example: enrichment and validation in parallel
 
