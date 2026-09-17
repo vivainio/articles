@@ -17,6 +17,7 @@ nav = [
   { "Home" = "index.md" },
   { "AI & coding agents" = [
     { "Overview" = "ai-agents/index.md" },
+    { "A Shared EC2 Dev Box for Coding Agents" = "ai-agents/shared-ec2-agent-server.md" },
     { "Codex for Claude Code Users (draft)" = "ai-agents/codex-for-claude-users.md" },
     { "My Vibing Flow" = "ai-agents/my-vibing-flow.md" },
   ] },

@@ -46,6 +46,9 @@ understand.](infrastructure/index.md)
 
 ## Latest notes
 
+- [A Shared EC2 Dev Box for Coding Agents](ai-agents/shared-ec2-agent-server.md) —
+  consolidating remote coding-agent work without sharing identities or active
+  Git working trees.
 - [Document Processing Pipeline with EventBridge Choreography](infrastructure/document-pipeline-eventbridge.md) —
   explicit service ownership, reliable event handoffs, and queryable progress.
 - [Document Processing Pipeline with Lambda Durable Functions](infrastructure/document-pipeline-durable-functions.md) —

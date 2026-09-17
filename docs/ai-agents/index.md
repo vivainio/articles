@@ -10,6 +10,9 @@ the permission models, and the surrounding workflow.
 
 ## Notes
 
+- [A Shared EC2 Dev Box for Coding Agents](shared-ec2-agent-server.md) — a
+  multi-user remote development host with SSM access, per-user Git checkouts,
+  rootless Podman, and no inbound ports.
 - [Codex for Claude Code Users](codex-for-claude-users.md) *(draft)* —
   configuration, permissions, reusable workflows, and long-running work across
   the two agents.
