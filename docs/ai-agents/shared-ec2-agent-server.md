@@ -165,6 +165,48 @@ general-purpose or multi-team sandbox account where instances accumulate
 different user sets independently over time -- which is itself a reason to
 prefer `sudo -iu <user>` there instead of touching the shared preference.
 
+EC2 Instance Connect, and its VPC-scoped Instance Connect Endpoint variant,
+offer a similar SSH path that also avoids inbound security-group rules -- the
+endpoint only needs to be reachable from its own security group, not the
+internet -- and it runs into the identical shared-role problem. Restricting
+which OS user a principal may push a key for is done through an IAM condition
+on `ec2-instance-connect:SendSSHPublicKey`; AWS's example policies use a key
+named `ec2:osuser` for exactly this. A naive policy per person still means one
+IAM statement, or one role, per person, which is the wrong shape under a
+shared IAM Identity Center permission set.
+
+The fix is the same fix: attribute-based access control, with one statement
+attached once to the shared role instead of one per person --
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "ec2-instance-connect:SendSSHPublicKey",
+  "Resource": "arn:aws:ec2:region:account:instance/i-0123456789abcdef0",
+  "Condition": {
+    "StringEquals": { "ec2:osuser": "${aws:PrincipalTag/UnixUser}" }
+  }
+}
+```
+
+The policy variable `${aws:PrincipalTag/UnixUser}` resolves to a different
+value per session, so the same statement enforces a different Unix username
+for every person, provided a `UnixUser` session tag is actually present on
+their session. That tag still has to come from somewhere: an IAM Identity
+Center attribute mapping that injects it from the identity source at
+federation time -- the same one-time ABAC project noted above for Run As, not
+a per-person role. It has one advantage over Run As: the condition is scoped
+to whichever instance `Resource` ARN the statement names, so it does not
+carry Run As's account/Region-wide blast radius.
+
+(!) `ec2:osuser` could not be confirmed against AWS's current documentation
+while writing this -- the docs site did not render for automated fetches
+during that check, and IAM's policy simulator cannot distinguish a real,
+service-populated condition key from a fabricated one, so testing a
+made-up key alongside it produced identical results. Treat this as a
+pattern to verify against a real, narrowly-scoped test role before relying
+on it, not a confirmed control.
+
 ## Share a repository, not a working tree
 
 A shared repository from which users create separate worktrees is a good
