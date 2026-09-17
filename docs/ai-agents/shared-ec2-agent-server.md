@@ -74,6 +74,13 @@ shell history, package caches, and API credentials. Do not place secrets in a
 shared shell profile. Prefer each tool's login flow or a secrets service, and
 grant `sudo` only where it is actually needed.
 
+Developers can still use the AWS CLI to access other AWS accounts through IAM
+Identity Center. Each Unix user keeps their own AWS profiles and cached SSO
+session in their home directory, runs `aws sso login`, and selects the intended
+account and role with an explicit `--profile`. This access is independent of
+the EC2 instance role, which remains available to commands that do not select
+another credential source.
+
 Session Manager can start a session as a named OS user. Enable **Run As** in
 Session Manager preferences, create the corresponding account on the instance,
 and tag each IAM user or role with `SSMSessionRunAs=<username>`. AWS checks the
