@@ -37,6 +37,30 @@ fixed cost for a small development box. VPC endpoints can remove some NAT
 traffic, but they do not replace general internet access to GitHub, Anthropic,
 OpenAI, npm, PyPI, and similar services.
 
+The calculation changes when a dynamic set of development machines in the same
+VPC must reach services that allowlist source IPv4 addresses. The simplest
+managed option is to put the machines in private subnets and route their
+internet-bound traffic through a public NAT Gateway with an Elastic IP. The
+external services then see one stable address for the fleet, while instances
+can be added, replaced, or removed without changing the allowlist and still
+accept no internet-initiated traffic.
+
+This simplicity has a material cost: AWS charges for each NAT Gateway hour and
+for every gigabyte it processes, in addition to public IPv4 and normal data
+transfer charges. In `eu-west-1`, one continuously provisioned gateway and its
+public IPv4 address are on the order of $40 per month before traffic, plus
+roughly five cents per gigabyte processed; check current
+[VPC pricing](https://aws.amazon.com/vpc/pricing/) before provisioning.
+
+For disposable development machines, one NAT Gateway is a reasonable choice:
+it keeps the allowlist to one address, and loss of internet access during an
+Availability Zone failure is usually acceptable. Instances in other zones may
+also incur cross-zone traffic charges. A gateway in every Availability Zone
+would improve availability but multiply the fixed cost and the number of
+addresses to allowlist. A self-managed NAT instance can cost less at low traffic
+volumes, but gives the team responsibility for patching, capacity, monitoring,
+and failover.
+
 ## Size for builds, not inference
 
 The coding agent process is rarely the capacity problem. Test suites,
@@ -254,6 +278,30 @@ the following in infrastructure and configuration code:
 Dotfiles and personal agent configuration should remain user-owned and roam
 through a private dotfiles repository or a tool such as chezmoi. Shared base
 packages belong in machine provisioning; personal credentials do not.
+
+## Other things worth sharing
+
+A multi-user machine also creates some optional consolidation opportunities:
+
+- dependency, compiler, and build caches for tools such as npm, Maven, Gradle,
+  Cargo, `ccache`, and `sccache`
+- a pull-through container registry cache for commonly used base images
+- long-lived development services such as PostgreSQL, Redis, Kafka, or
+  LocalStack, with separate databases, namespaces, and credentials per user
+- artifact storage for test reports, installers, database snapshots, and other
+  large outputs that do not belong in Git
+- shared monitoring for disk pressure, resource contention, container logs,
+  and preview-service health
+- scheduled cache warming, image pulls, repository fetches, snapshots, and
+  shutdown of idle services
+
+These are possibilities rather than requirements. They add operational state
+and are worthwhile only when repeated downloads, builds, or duplicate services
+are a measurable cost. A useful boundary is to share expensive immutable inputs
+and deliberately managed services while keeping credentials, working trees,
+agent history, and disposable experiments per user. Avoid shared writable
+package environments, root-equivalent container sockets, and databases without
+clear per-user isolation.
 
 ## When consolidation stops paying
 
