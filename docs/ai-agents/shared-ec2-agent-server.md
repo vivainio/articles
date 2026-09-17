@@ -72,17 +72,38 @@ use, but sustained concurrent builds consume CPU credits. A general-purpose
 instance is easier to reason about once the machine is busy for much of the
 day.
 
-Use gp3 EBS storage for home directories and active repositories. EFS is useful
-when several instances must mount the same files or when instances are meant to
-be disposable. It is otherwise extra cost and network-filesystem latency in a
-workload that walks many small files.
+## Put home directories on the large volume
 
-Stopping the instance for a weekend does not require EFS. AWS preserves
-attached EBS volumes across a normal stop/start cycle and stops charging for
-instance usage while the instance is stopped; storage and some other resources
-still incur charges. Instance-store data and an automatically assigned public
-IPv4 address do not survive that cycle. See AWS's [EC2 stop/start
-behavior](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html).
+Disk demand does not live only in the shared repository. Rootless container
+images and volumes, dependency caches, SDKs, language servers, personal clones,
+agent state, and build outputs normally accumulate under each user's home
+directory. A large data volume must therefore cover `/home` as well as shared
+paths under `/srv`.
+
+A practical starting layout is a 50--100 GiB root volume for Ubuntu and shared
+tools plus a 1--2 TiB gp3 EBS data volume. Mount the data volume at `/data` and
+bind-mount directories from it onto `/home`, `/srv/git`, and `/srv/worktrees`,
+or use separate data volumes when those paths need different backup or lifecycle
+policies. One filesystem pools free space more efficiently, but user quotas and
+alerts are important so one container image store or build cache cannot fill it
+for everyone.
+
+EBS volumes can normally be enlarged online, after which the partition and
+filesystem must also be extended. They cannot be shrunk in place. At the time
+of writing, gp3 storage in `eu-west-1` is roughly $90 per TiB-month, so 2 TiB is
+about $180 per month before snapshots or any extra provisioned performance.
+Check current [EBS pricing](https://aws.amazon.com/ebs/pricing/) and alert at
+several thresholds before the filesystem is full.
+
+EFS is useful when several instances must mount the same files or when instances
+are meant to be disposable. It is otherwise extra cost and network-filesystem
+latency in a workload that walks many small files. Stopping an instance for a
+weekend does not require EFS: AWS preserves attached EBS volumes across a normal
+stop/start cycle, although storage charges continue. Encrypt the data volume
+and its snapshots and restrict snapshot access because they contain every
+user's credentials and agent state. Instance-store data and an automatically
+assigned public IPv4 address do not survive a stop/start cycle. See AWS's
+[EC2 stop/start behavior](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html).
 
 ## Give every person a real Unix identity
 
@@ -110,6 +131,18 @@ Session Manager preferences, create the corresponding account on the instance,
 and tag each IAM user or role with `SSMSessionRunAs=<username>`. AWS checks the
 IAM session tag first, then the role tag, then the configured default user.
 
+That tag is close to unusable once federated access through IAM Identity
+Center (AWS SSO) is in the picture, which it typically is for a shared team
+account. Everyone who assumes a given permission set shares the same IAM
+role, so `aws iam tag-role` on it sets one Unix user for every person who
+federates in through it -- it maps a role, not a person. Getting a distinct
+Unix user per person would mean attaching session tags at assume-role time
+through IAM Identity Center attribute mappings (ABAC), pulling something like
+an email or username attribute from the identity source into a session tag on
+federation -- a real Identity Center configuration project, not a single CLI
+call. `sudo -iu <user>` sidesteps all of it: no IAM or Identity Center changes,
+just the Unix account.
+
 There is an important scope detail: IAM tags let different identities map to
 different Unix users, but enabling Run As is still a Session Manager preference
 for the AWS account and Region. Editing an agent JSON file on one instance is
@@ -117,6 +150,20 @@ not an instance-local substitute. If that scope is unacceptable, keep the
 default SSM login and use tightly controlled `sudo -iu <user>`, or provision a
 separate account or Region boundary. AWS documents the exact behavior in
 [Turn on Run As support](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-preferences-run-as.html).
+
+The mapped username also has to exist as a real account on whatever instance
+the session lands on. When it does not, Session Manager fails the session
+instead of quietly falling back to a default user; the `sudo -iu <user>`
+substitute fails the same way, with `sudo: unknown user <name>` and a nonzero
+exit. That is a safe failure, but it means the account/Region-wide preference
+carries an implicit account/Region-wide obligation: every instance a mapped
+identity might connect to needs the same username provisioned on it, or their
+session breaks there. That is easy to guarantee on an AWS account dedicated to
+this one shared-dev-box purpose, where accounts are provisioned uniformly
+across a small, known set of instances. It is much harder to guarantee on a
+general-purpose or multi-team sandbox account where instances accumulate
+different user sets independently over time -- which is itself a reason to
+prefer `sudo -iu <user>` there instead of touching the shared preference.
 
 ## Share a repository, not a working tree
 
