@@ -61,6 +61,23 @@ addresses to allowlist. A self-managed NAT instance can cost less at low traffic
 volumes, but gives the team responsibility for patching, capacity, monitoring,
 and failover.
 
+## A second access path for real SSH
+
+Session Manager covers the interactive-shell case well, but its relay adds
+noticeable overhead for file-heavy work such as `scp`, `rsync`, or an
+editor's remote-file protocol. EC2 Instance Connect Endpoint offers real SSH
+into the same instance without reopening it to the internet: the endpoint is
+a VPC resource, the instance's security group only needs to accept traffic
+from the endpoint's own security group rather than any public address range,
+and no port ends up reachable from outside that boundary.
+
+Treat the two as complementary rather than a replacement for one another.
+Session Manager stays the simpler default for an interactive shell and for
+non-interactive command execution from automation; add an Instance Connect
+Endpoint when a workflow specifically benefits from SSH's throughput or its
+ecosystem of SSH-based tools, and accept the extra VPC resource and security
+group as the cost of that.
+
 ## Size for builds, not inference
 
 The coding agent process is rarely the capacity problem. Test suites,
@@ -165,12 +182,10 @@ general-purpose or multi-team sandbox account where instances accumulate
 different user sets independently over time -- which is itself a reason to
 prefer `sudo -iu <user>` there instead of touching the shared preference.
 
-EC2 Instance Connect, and its VPC-scoped Instance Connect Endpoint variant,
-offer a similar SSH path that also avoids inbound security-group rules -- the
-endpoint only needs to be reachable from its own security group, not the
-internet -- and it runs into the identical shared-role problem. Restricting
-which OS user a principal may push a key for is done through an IAM condition
-on `ec2-instance-connect:SendSSHPublicKey`; AWS's example policies use a key
+The Instance Connect Endpoint path described above runs into the identical
+shared-role problem as Run As. Restricting which OS user a principal may push
+a key for is done through an IAM condition on
+`ec2-instance-connect:SendSSHPublicKey`; AWS's example policies use a key
 named `ec2:osuser` for exactly this. A naive policy per person still means one
 IAM statement, or one role, per person, which is the wrong shape under a
 shared IAM Identity Center permission set.
