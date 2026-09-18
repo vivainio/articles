@@ -199,6 +199,13 @@ a per-person role. It has one advantage over Run As: the condition is scoped
 to whichever instance `Resource` ARN the statement names, so it does not
 carry Run As's account/Region-wide blast radius.
 
+Populating that tag is not self-service from inside a member account.
+Attribute mappings are configured centrally, in IAM Identity Center's own
+Settings page in the Organizations management or delegated-admin account, so
+this means asking whoever administers Identity Center to add the mapping --
+the same team boundary that governs the identity source and its SCIM sync in
+the first place.
+
 (!) `ec2:osuser` could not be confirmed against AWS's current documentation
 while writing this -- the docs site did not render for automated fetches
 during that check, and IAM's policy simulator cannot distinguish a real,
