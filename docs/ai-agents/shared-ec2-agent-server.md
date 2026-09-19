@@ -229,6 +229,69 @@ made-up key alongside it produced identical results. Treat this as a
 pattern to verify against a real, narrowly-scoped test role before relying
 on it, not a confirmed control.
 
+## Give each user a password-unlocked private directory
+
+The shared EBS data volume should remain encrypted with AWS KMS, but it does
+not need a separate EBS volume or a fixed-size filesystem image for every
+person. Instead, each user can create a [gocryptfs](https://github.com/rfjakob/gocryptfs/blob/master/Documentation/MANPAGE.md)
+encrypted directory in their home. gocryptfs stores encrypted files and file
+names in a backing directory and presents a plaintext view at a mount point
+only after that user enters a password. Both directories live on the large
+data volume already mounted under `/home`:
+
+```text
+/home/alice/.private.cipher/   encrypted backing files
+/home/alice/private/           plaintext view while unlocked
+```
+
+Alice can initialize this without a per-user block device or a root-managed
+mount. Run the initialization once; after a reboot or unmount, run only the
+last command to unlock it again:
+
+```bash
+umask 077
+mkdir -m 700 "$HOME/.private.cipher" "$HOME/private"
+gocryptfs -init "$HOME/.private.cipher"
+gocryptfs "$HOME/.private.cipher" "$HOME/private"
+```
+
+Keep the password and gocryptfs recovery key outside the instance. Do not put
+an unlock password in a shell profile, command argument, or password file on
+the same host; that would defeat the extra at-rest boundary. Leave FUSE's
+`allow_other` option off, and keep the home and backing directories private to
+their Unix owner.
+
+For Claude Code, set `CLAUDE_CONFIG_DIR` to a directory *inside the unlocked
+mount* before the first `/login` and before starting each session, for example
+`$HOME/private/claude`. Claude Code's
+[authentication documentation](https://code.claude.com/docs/en/authentication)
+specifies that its Linux login credentials live under that directory when the
+variable is set. Check that `private` is mounted before launching Claude Code,
+or it could create an unencrypted config in the empty mount-point directory.
+The same principle applies to other tools: put their credential stores in the
+encrypted view, but keep shared Git metadata, build outputs, and caches outside
+it unless they genuinely need encryption.
+
+This protects credentials in the backing directory and EBS snapshots while
+the private directory is **unmounted**. It does not protect them from processes
+running as Alice, or from a host administrator, while the view is unlocked.
+Persistent Herdr agents need it to remain mounted for as long as they use
+those credentials; logging out of SSH or detaching Herdr does not automatically
+lock it. After stopping every process that needs the directory, Alice locks it
+by unmounting the plaintext view:
+
+```bash
+fusermount -u "$HOME/private"
+```
+
+If a process has an open file or its working directory inside the mount,
+unmounting may fail; stop that process first. Do not force a lazy unmount and
+assume its open handles have been secured. Back up the encrypted backing
+directory, including `gocryptfs.conf`, rather than copying files from the
+plaintext mount. Unix identities, private home-directory permissions, and
+removing ordinary users' unrestricted `sudo` remain the primary isolation
+between people on the running host.
+
 ## Use VS Code through Instance Connect Endpoint
 
 VS Code Remote SSH gives Windows users a local editor while source code,
