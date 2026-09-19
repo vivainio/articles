@@ -24,7 +24,7 @@ I would start with this:
 - one Unix account and home directory per person
 - one shared bare Git repository with a separate worktree per person or task
 - rootless Podman for disposable services and build environments
-- `tmux` or [Herdr](../terminal/herdr.md) for sessions that survive disconnects
+- [Herdr](../terminal/herdr.md) for sessions that survive disconnects
 
 The instance needs outbound HTTPS for agent APIs, Git hosting, package
 registries, operating-system updates, and AWS services. It does not need an
@@ -273,6 +273,25 @@ and VS Code's documentation for [Remote
 SSH](https://code.visualstudio.com/docs/remote/ssh) and
 [multi-user hosts](https://code.visualstudio.com/docs/remote/troubleshooting#_improving-security-on-multiuser-servers).
 
+## Run Herdr locally, keep its sessions on the server
+
+Herdr can use the same `agent-dev` SSH host entry through the Instance Connect
+Endpoint. Install Herdr on the laptop and the EC2 instance, then attach from
+the laptop:
+
+```bash
+herdr --remote agent-dev
+```
+
+The local Herdr client draws the interface, while the remote Herdr server owns
+the panes, shells, and agents under Alice's Unix account. Detaching or losing
+the SSH connection leaves those processes running on EC2; reconnecting
+reattaches to them. This gives Windows users a local interface, including
+local clipboard integration, without moving their checkouts or credentials
+off the server or opening another inbound port. Herdr also supports saving
+SSH machines in one local window when someone works on several hosts. See its
+[remote access documentation](https://herdr.dev/docs/persistence-remote/).
+
 ## Remote Control fits better than self-hosted cloud sessions
 
 If a developer wants to continue a Claude Code task from a phone or browser,
@@ -281,7 +300,7 @@ fit for this box. Start Claude Code under that person's Unix account, in their
 own checkout, and enable Remote Control with `claude --remote-control` (or run
 `claude remote-control` for a server-mode session). The web and mobile clients
 then control a process that still runs on the EC2 instance, with that user's
-files, tools, and credentials. Keep the process alive with `tmux` or Herdr if
+files, tools, and credentials. Keep the process in Herdr if
 it needs to outlast the SSH connection. Remote Control uses outbound HTTPS, so
 it does not require another inbound port or security-group rule.
 
@@ -482,7 +501,7 @@ the following in infrastructure and configuration code:
 - instance, EBS volume, IAM instance role, and security group
 - SSM connectivity and narrowly scoped user access
 - Unix accounts, subordinate UID/GID ranges, and resource limits
-- Podman, Git, agent CLIs, tmux, and Herdr installation
+- Podman, Git, agent CLIs, and Herdr installation
 - scheduled stop/start behavior, backups, and EBS snapshot policy
 - disk, memory, CPU, and failed SSM-session monitoring
 
