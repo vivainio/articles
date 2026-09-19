@@ -229,6 +229,88 @@ made-up key alongside it produced identical results. Treat this as a
 pattern to verify against a real, narrowly-scoped test role before relying
 on it, not a confirmed control.
 
+## Use VS Code through Instance Connect Endpoint
+
+VS Code Remote SSH gives Windows users a local editor while source code,
+terminals, extensions, language servers, builds, and debuggers run on the EC2
+instance. Route that SSH connection through the EC2 Instance Connect Endpoint
+described above. The instance needs `sshd`, but no public IP or internet-facing
+port 22; its security group accepts SSH only from the endpoint's security
+group.
+
+Each laptop needs VS Code's Remote SSH extension, AWS CLI v2, an SSH client,
+and credentials allowed to open the endpoint tunnel. An OpenSSH host entry can
+use the instance ID as its destination:
+
+```sshconfig
+Host agent-dev
+    HostName i-0123456789abcdef0
+    User alice
+    IdentityFile ~/.ssh/id_ed25519
+    ProxyCommand aws ec2-instance-connect open-tunnel --profile development --region eu-west-1 --instance-id %h
+```
+
+The endpoint and IAM policy authorize the network tunnel; SSH authentication
+still determines which Unix account it enters. The simplest VS Code setup is a
+separate durable SSH public key in each user's `authorized_keys`. If policy
+requires EC2 Instance Connect's short-lived pushed keys instead, add a tested
+connection helper that calls `SendSSHPublicKey` before opening the tunnel: the
+`open-tunnel` proxy command alone does not install a key. This is also where the
+per-user IAM mapping discussed above must be enforced.
+
+Remote SSH installs a separate VS Code Server and remote extensions under each
+user's home directory. This fits the Unix account model but adds another reason
+to put `/home` on the large data volume. On a multi-user Linux host, enable VS
+Code's `Remote.SSH: Remote Server Listen On Socket` setting so each server uses
+a user-protected Unix socket instead of a random local TCP port. VS Code can
+forward preview ports over the same SSH connection without publishing them on
+the VPC network.
+
+AWS records attempts to open Instance Connect Endpoint tunnels in CloudTrail,
+but it does not record commands inside the encrypted SSH connection. See AWS's
+[Instance Connect Endpoint SSH instructions](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/connect-using-eice.html)
+and VS Code's documentation for [Remote
+SSH](https://code.visualstudio.com/docs/remote/ssh) and
+[multi-user hosts](https://code.visualstudio.com/docs/remote/troubleshooting#_improving-security-on-multiuser-servers).
+
+## Remote Control fits better than self-hosted cloud sessions
+
+If a developer wants to continue a Claude Code task from a phone or browser,
+[Remote Control](https://code.claude.com/docs/en/remote-control) is the closer
+fit for this box. Start Claude Code under that person's Unix account, in their
+own checkout, and enable Remote Control with `claude --remote-control` (or run
+`claude remote-control` for a server-mode session). The web and mobile clients
+then control a process that still runs on the EC2 instance, with that user's
+files, tools, and credentials. Keep the process alive with `tmux` or Herdr if
+it needs to outlast the SSH connection. Remote Control uses outbound HTTPS, so
+it does not require another inbound port or security-group rule.
+
+[Self-hosted environments](https://code.claude.com/docs/en/self-hosted-environments)
+solve a different problem: they route newly started Claude Code *cloud
+sessions* to runners operated by the organization. A runner claims a queued
+session, clones its repository, and executes model-directed code. It does not
+simply attach a remote client to a developer's existing Unix account and
+worktree. That makes it attractive for centrally managed, disposable cloud
+sessions, but awkward as an add-on to a host holding several people's private
+home directories and agent credentials.
+
+The security boundary matters more than the hardware fit. Anthropic currently
+has no per-environment dispatch access control: any member of the Anthropic
+organization can select its self-hosted environment. Its
+[production guidance](https://code.claude.com/docs/en/self-hosted-environments-deploy)
+calls for fresh per-session containers, isolated filesystems, narrowly scoped
+credentials, and protection of the runner's environment secret. A runner on
+this shared login host must never inherit or mount users' homes, SSH keys, or
+the shared writable Git repository. If cloud sessions become useful, give
+their runners a separate EC2 instance or comparably strong isolation boundary
+and treat them as a separate service, not another user's shell on this box.
+
+Remote Control is still subject to the user's Claude account and organization
+settings: Team and Enterprise owners must enable it, it requires a claude.ai
+login rather than an API key or Bedrock-backed session, and the session
+transcript is stored by Anthropic for cross-device continuity. Check those
+constraints before making it the default mobile workflow.
+
 ## Share a repository, not a working tree
 
 A shared repository from which users create separate worktrees is a good
@@ -295,10 +377,10 @@ not rule out distinct linked worktrees backed by a shared repository among
 trusted users.
 
 This also answers the Windows file-sharing question: avoid Samba for live
-repositories. Work through a remote terminal, use an editor over an SSM-backed
-SSH connection if desired, and move deliberate artifacts with Git, S3, or an
-explicit copy operation. The files remain on the server instead of being
-continuously synchronized underneath Git.
+repositories. Work through a remote terminal, use an editor over an Instance
+Connect Endpoint-backed SSH connection, and move deliberate artifacts with
+Git, S3, or an explicit copy operation. The files remain on the server instead
+of being continuously synchronized underneath Git.
 
 ## Rootless Podman fits the account model
 
@@ -323,6 +405,26 @@ whose background services should survive logout:
 sudo loginctl enable-linger alice
 ```
 
+### SSH into the host or into a container?
+
+The Instance Connect Endpoint carries TCP, so it can reach an `sshd` inside a
+container if Podman publishes that container's port on the instance's private
+IP. For example, a per-user container could publish its port 22 as host port
+2222, and the user's `open-tunnel` command could select `--remote-port 2222`.
+Binding the published port only to `127.0.0.1` would not work for a direct
+tunnel to the instance's private IP. The security group would also need to
+allow that port from the endpoint.
+
+This creates a second access-control scheme to maintain. An endpoint tunnel
+authorizes a connection to an IP and port, not a Unix or container user. SSH
+inside the container must authenticate the user, and IAM should restrict which
+remote ports each person may tunnel to. A port number alone is not isolation.
+For ordinary build and service containers, prefer SSH into the person's host
+account and run `podman exec` there: one SSH identity boundary is easier to
+audit. Direct container SSH is useful when the container is intended to be a
+long-lived, independently managed development environment, but it brings its
+own keys, `sshd` lifecycle, port assignments, and firewall policy.
+
 ## Let the machine choose preview ports
 
 Several users cannot all publish a service on host port 8080. For temporary
@@ -334,9 +436,10 @@ podman port --latest 8080
 ```
 
 Binding to `127.0.0.1` keeps the preview off the instance's network interfaces.
-Reach it through an SSM port-forwarding session. This is cleaner than opening a
-security-group rule for every preview and safer than publishing on all
-interfaces.
+Reach it through local port forwarding on the same SSH connection used for
+development. The Instance Connect Endpoint carries SSH to port 22; SSH carries
+the preview traffic inside that connection. No additional security-group rule
+is needed for each preview.
 
 For example, suppose Alice starts a web application that listens on port 8080
 inside its container:
@@ -348,26 +451,23 @@ $ podman port alice-preview 8080
 127.0.0.1:32815
 ```
 
-Podman selected host port `32815`. On her Windows laptop, Alice starts a
-Session Manager tunnel to that port from WSL:
+Podman selected host port `32815`. With the `agent-dev` SSH host entry above,
+Alice starts a local forward on her laptop:
 
 ```bash
-aws ssm start-session \
-  --target i-0123456789abcdef0 \
-  --document-name AWS-StartPortForwardingSession \
-  --parameters 'portNumber=["32815"],localPortNumber=["8080"]'
+ssh -N -L 127.0.0.1:8080:127.0.0.1:32815 agent-dev
 ```
 
 She can now open [http://localhost:8080](http://localhost:8080) in her Windows
-browser. Requests to that local port travel through Session Manager to
-`127.0.0.1:32815` on the instance and then into the container. The EC2 instance
-needs no public IP, inbound security-group rule, or listening network port for
-the preview.
+browser. Requests to that local port travel through the Instance Connect
+Endpoint-backed SSH connection to `127.0.0.1:32815` on the instance and then
+into the container. The command stays open for the lifetime of the forward;
+stopping it removes laptop access without changing the server or its firewall.
 
-The laptop needs the AWS CLI and Session Manager plugin, and Alice's IAM
-identity needs permission to start a session on the instance. The command stays
-open for the lifetime of the tunnel; stopping it removes local access without
-changing the server or its firewall.
+Host loopback is shared by all Unix users on this instance. Binding the preview
+to `127.0.0.1` keeps it off the VPC network, but it does not stop Bob from
+connecting to Alice's host port locally. Previews that contain sensitive data
+still need application authentication or a stronger per-user network boundary.
 
 Stable shared services need a different arrangement: assign explicit ports
 from documented per-user ranges, or put an authenticated reverse proxy in
