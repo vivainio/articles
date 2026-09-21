@@ -27,6 +27,12 @@ interrupting a process.
 - ++option+backspace++ deletes the previous word.
 - Holding ++option++ while typing produces special characters, for example
   ++option+2++ gives ™ on a US layout.
+- On European keyboard layouts ++option++ also works as **AltGr**: it is the
+  key for `@`, brackets, braces, backslash, and `|`. On a Finnish layout, for
+  example, `@` is ++option+2++, `[` and `]` are ++option+8++ and ++option+9++,
+  and `{` `}` add ++shift++. The exact keys differ per layout, so check the
+  Keyboard Viewer (enable *Show Input menu in menu bar* in *Keyboard → Text
+  Input → Input Sources*) to see what Option and ++option+shift++ produce.
 - Holding ++option++ while clicking a menu often reveals a hidden alternate
   item (for example, "Save As…" instead of "Save").
 - In a terminal you often want Option to act as Meta/Alt. In Terminal.app
