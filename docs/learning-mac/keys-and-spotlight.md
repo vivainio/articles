@@ -108,7 +108,7 @@ of saving a file.
 | ++cmd+o++ or ++cmd+down++ | Open the selected item |
 | ++space++ | Quick Look: preview the file without opening it |
 | ++cmd+backspace++ | Move to Trash |
-| ++cmd+shift+dot++ | Show/hide hidden files |
+| ++cmd+shift+period++ | Show/hide hidden files |
 | ++cmd+shift+g++ | Go to a folder by typing its path |
 | ++cmd+up++ | Go to the enclosing folder |
 
