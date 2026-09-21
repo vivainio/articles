@@ -26,6 +26,10 @@ nav = [
     { "Tmux Tutorial" = "terminal/tmux.md" },
     { "Herdr Tutorial" = "terminal/herdr.md" },
   ] },
+  { "Learning Mac" = [
+    { "Overview" = "learning-mac/index.md" },
+    { "Keys, Shortcuts, and Spotlight" = "learning-mac/keys-and-spotlight.md" },
+  ] },
   { "Building & shipping" = [
     { "Overview" = "building/index.md" },
     { "Cloudflare's Free Tier" = "building/cloudflare-free-tier.md" },

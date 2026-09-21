@@ -34,6 +34,10 @@ terminal environments around them.](ai-agents/index.md)
 Tools and configurations that make a terminal-centered working life more
 comfortable.](terminal/index.md)
 
+[:lucide-laptop: **Learning Mac**  
+A practical guide to macOS for people whose hands still reach for the wrong
+keys, starting with modifiers, shortcuts, and Spotlight.](learning-mac/index.md)
+
 [:lucide-package-open: **Building & shipping**  
 Small systems, packaging techniques, and practical ways to get software into
 people's hands.](building/index.md)
@@ -46,6 +50,9 @@ understand.](infrastructure/index.md)
 
 ## Latest notes
 
+- [Keys, Shortcuts, and Spotlight](learning-mac/keys-and-spotlight.md) —
+  what Command and Option do, the shortcuts to learn first, and launching
+  everything from Spotlight.
 - [A Shared EC2 Dev Box for Coding Agents](ai-agents/shared-ec2-agent-server.md) —
   consolidating remote coding-agent work without sharing identities or active
   Git working trees.
