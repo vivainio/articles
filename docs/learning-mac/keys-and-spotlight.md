@@ -121,6 +121,56 @@ If an app hangs, use ++cmd+option+esc++ to open the Force Quit window.
     menu in any app has a search box that finds menu items by name and shows
     you where they live, which is a quick way to learn shortcuts as you go.
 
+## Mouse and trackpad
+
+### Right click
+
+- **Trackpad:** click with two fingers. If that does nothing, enable it in
+  *System Settings → Trackpad → Point & Click → Secondary click*.
+- **Any pointing device:** hold ++ctrl++ and click. This works everywhere,
+  including with a one-button mouse or a laptop with the trackpad set to
+  single-finger clicks.
+- **Mouse:** a mouse with two buttons works as expected once *Secondary click*
+  is set to the right side in *System Settings → Mouse*.
+
+### Modifier clicks
+
+| Action | Result |
+|--------|--------|
+| ++cmd++ + click on a link | Open in a new tab (browsers) |
+| ++cmd++ + click on files | Add or remove a single item from the selection |
+| ++shift++ + click on files | Select a range |
+| ++option++ + drag a file | Copy it instead of moving it |
+| ++cmd+option++ + drag a file | Create an alias (a shortcut) |
+| ++cmd++ + drag a window | Move a background window without focusing it |
+| ++option++ + click the green window button | Maximize the window (without fullscreen) |
+| ++option++ + click a menu | Show alternate menu items |
+
+Double-clicking a window's title bar zooms or maximizes it, depending on the
+setting in *Desktop & Dock*.
+
+### Gestures worth knowing
+
+| Gesture | Action |
+|---------|--------|
+| Two-finger scroll | Scroll |
+| Two-finger swipe left/right | Back / forward in browsers and many apps |
+| Pinch, or double-tap with two fingers | Zoom |
+| Three-finger tap (or force click) | Look up the word under the pointer |
+| Three or four fingers up | Mission Control |
+| Three or four fingers left/right | Switch desktops |
+
+!!! tip "Turn on tap to click and three-finger drag"
+    Tap to click is off by default: *System Settings → Trackpad → Point &
+    Click*. Three-finger drag, which moves windows and selects text without
+    pressing down, is in *Accessibility → Pointer Control → Trackpad
+    Options → Use trackpad for dragging*.
+
+!!! note "Scroll direction"
+    "Natural" scrolling moves the content like a touch screen, and it is on
+    by default. If a mouse feels backwards, turn it off in *System Settings →
+    Mouse*. The trackpad has its own separate switch.
+
 ## Spotlight
 
 Spotlight is the launcher, calculator, unit converter, and search box for the
