@@ -135,6 +135,11 @@ If an app hangs, use ++cmd+option+esc++ to open the Force Quit window.
 
 ### Modifier clicks
 
+Like the everyday shortcuts, most of these match Windows with ++cmd++ in place
+of ++ctrl++: ++cmd++ + click toggles a single item and ++shift++ + click
+selects a range. The Mac-specific one is ++ctrl++ + click, which is right
+click, not multi-select.
+
 | Action | Result |
 |--------|--------|
 | ++cmd++ + click on a link | Open in a new tab (browsers) |
