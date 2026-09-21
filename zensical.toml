@@ -28,7 +28,7 @@ nav = [
   ] },
   { "Learning Mac" = [
     { "Overview" = "learning-mac/index.md" },
-    { "Keys, Shortcuts, and Spotlight" = "learning-mac/keys-and-spotlight.md" },
+    { "Everyday Shortcuts" = "learning-mac/everyday-shortcuts.md" },
   ] },
   { "Building & shipping" = [
     { "Overview" = "building/index.md" },

@@ -12,6 +12,6 @@ of the friction is.
 
 ## Notes
 
-- [Keys, Shortcuts, and Spotlight](keys-and-spotlight.md) — what ++cmd++ and
+- [Everyday Shortcuts](everyday-shortcuts.md) — what ++cmd++ and
   ++option++ actually do, the shortcuts worth learning first, and launching
   everything from Spotlight.

@@ -1,4 +1,4 @@
-# Keys, Shortcuts, and Spotlight
+# Everyday Shortcuts
 
 *2026-09-21*
 

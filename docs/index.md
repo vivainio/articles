@@ -50,7 +50,7 @@ understand.](infrastructure/index.md)
 
 ## Latest notes
 
-- [Keys, Shortcuts, and Spotlight](learning-mac/keys-and-spotlight.md) —
+- [Everyday Shortcuts](learning-mac/everyday-shortcuts.md) —
   what Command and Option do, the shortcuts to learn first, and launching
   everything from Spotlight.
 - [A Shared EC2 Dev Box for Coding Agents](ai-agents/shared-ec2-agent-server.md) —
