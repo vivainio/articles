@@ -60,6 +60,10 @@ start), ++ctrl+e++ (line end), ++ctrl+k++ (kill to end of line).
 
 ### Everyday
 
+These are the same as on Windows, with ++cmd++ in place of ++ctrl++. Your
+muscle memory carries over; only the finger changes. The ones without a
+Windows equivalent are ++cmd+q++ (quit) and ++cmd+comma++ (settings).
+
 | Shortcut | Action |
 |----------|--------|
 | ++cmd+c++ / ++cmd+x++ / ++cmd+v++ | Copy / cut / paste |
