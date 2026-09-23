@@ -59,6 +59,30 @@ Like the tmux config, the default prefix is replaced with `Ctrl+Space`. Since bo
 
 The two changes that matter most in my tmux config compared with the defaults are this `Ctrl+Space` prefix and prefix-free `Alt+Arrow` navigation. Mirroring those in Herdr preserves most of the muscle memory; the remaining bindings are much closer to what either multiplexer already provides.
 
+### Mac Bindings
+
+On the Mac, my config differs in the prefix: it is `Option+Space` instead of `Ctrl+Space`, because macOS already uses `Ctrl+Space` to switch input sources by default.
+
+```toml
+[keys]
+prefix = "alt+space"
+```
+
+Navigation stays prefix-free and uses the same `Option` key: `Option+Left/Right` switches tabs and `Option+Up/Down` switches workspaces. Herdr calls `Option` `alt`, so these are the same `alt+left`, `alt+right`, `alt+up`, and `alt+down` bindings as on Linux and Windows. Wherever this tutorial says `Alt`, press `Option` on the Mac, and read `Prefix` as `Option+Space`.
+
+For this to work, your terminal must send `Option` as `Alt`/Meta rather than using it to type special characters. In iTerm2, set the left Option key to **Esc+** in the profile's key settings; in Terminal.app, enable **Use Option as Meta key**.
+
+I use Ghostty, which needed a little more configuration. Besides treating `Option` as `Alt`, Ghostty's macOS defaults bind `Option+Left/Right` to word movement (`esc:b` / `esc:f`), so Herdr never sees a real `alt+arrow` and tab switching does nothing. Unbinding those keys fixes it. In `~/.config/ghostty/config`:
+
+```
+macos-option-as-alt = true
+
+# Send real alt+arrow sequences (for herdr tab switching) instead of
+# Ghostty's macOS default of esc:b / esc:f word movement.
+keybind = alt+arrow_left=unbind
+keybind = alt+arrow_right=unbind
+```
+
 ## Level 1: Tabs
 
 Herdr calls tabs "tabs" (tmux calls them "windows" - same thing):
