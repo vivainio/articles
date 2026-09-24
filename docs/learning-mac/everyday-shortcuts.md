@@ -228,6 +228,13 @@ good candidates).
   Control or Escape.
 - **Faster key repeat:** *System Settings → Keyboard* has sliders for key
   repeat rate and delay; turning both up makes text editing feel much snappier.
+- **Function keys:** to get F1–F12 without holding ++fn++, turn on *Keyboard
+  Shortcuts → Function Keys → Use F1, F2, etc. keys as standard function keys*.
+- **A layout for programming:** the Finnish layout hides `~`, `\`, `/` and
+  parentheses behind chords and dead keys.
+  [mac-sane-keyboards](https://github.com/vivainio/mac-sane-keyboards) is a
+  Finnish variant with no dead keys and those characters on single keys, with a
+  one-line installer.
 - **Full keyboard access:** in the same place you can enable Tab navigation
   across all controls in dialogs.
 - **Custom app shortcuts:** *Keyboard Shortcuts → App Shortcuts* lets you
