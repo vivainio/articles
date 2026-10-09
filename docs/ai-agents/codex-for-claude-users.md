@@ -60,9 +60,9 @@ Codex does not normally expand the session's sandbox every time you approve some
 
 There is an experimental Codex facility for requesting additional per-command permissions while remaining sandboxed, but it is still marked under development and disabled by default. It is not something to build a normal setup around yet.
 
-## Auto mode is configured, not toggled with Shift+Tab
+## Auto-review can be configured as the default
 
-In Claude Code you can press `Shift+Tab` to cycle permission modes, including an auto-accepting mode. Codex does not use that interaction for its auto mode. Configure automatic approval review in `~/.codex/config.toml`:
+To make automatic approval review the default in Codex CLI, use the [documented configuration](https://learn.chatgpt.com/docs/sandboxing/auto-review) in `~/.codex/config.toml`:
 
 ```toml
 approval_policy = "on-request"
@@ -79,17 +79,18 @@ each repository. I always use this auto mode; I prefer letting the reviewer
 handle routine escalation decisions instead of interrupting the session for
 manual confirmation.
 
-There is an important reliability problem, though: the automatic reviewer can
-hang while processing an approval or eventually time out. When that happens,
-approval-dependent work grinds to a halt. Claude Code lets you press
-`Shift+Tab` to leave its auto mode and handle approvals manually, but Codex has
-no equivalent in-session escape hatch. You can therefore get stuck waiting for
-a reviewer that is no longer approving anything, making it effectively
-impossible to continue the task in that session. Interrupting the session and
-relaunching Codex usually gets approval handling working again, but that does
-not make this merely a troubleshooting footnote. It is a recurring reliability
-problem in a core workflow, and a concrete reason to prefer Claude Code until
-Codex addresses it.
+You can also change permissions during a session. The CLI provides
+`/permissions` to change the active permissions profile. The desktop app and
+IDE extension have a permissions control beneath the composer, including
+**Approve for me** where available. See the [documented permissions controls](https://learn.chatgpt.com/docs/sandboxing#how-permissions-work).
+
+In my use, the automatic reviewer has sometimes hung while processing an
+approval or eventually timed out, blocking approval-dependent work.
+Interrupting the session and relaunching Codex has usually restored approval
+handling. The documentation establishes that in-session permission switching
+exists, but it does not establish whether switching modes can recover an
+already-hung review. That recovery behavior remains unverified; the hangs are
+still a reliability concern in my workflow.
 
 ## Command rules and the automatic reviewer are separate
 
