@@ -39,6 +39,8 @@ an RFC.
 - [Why a 64-bit mantissa](why-64-bits.md) — the value layout, the alternatives
   and what each costs, what the choice gives up, and a correction to my own
   first argument.
+- [Performance at a glance](performance.md) — every speed and memory number
+  in the series on one page, interpreter and native code generation.
 - [How decimals feel next to number, integer and vector](ergonomics.md) — an
   operation-by-operation comparison, the mixing rules, the error messages, the
   editor experience, and the costs you can feel.

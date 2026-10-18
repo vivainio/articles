@@ -61,24 +61,25 @@ the arithmetic in 128 bits, like the core version does. I deliberately wrote it
 to a small spec (add, subtract, multiply, compare, print, parse); it is a
 baseline for measuring, not a library.
 
-Then the same loop in each: a million additions of `0.01`.
+Then the same loop in each, additions of `0.01`, with plain `number` for scale:
 
-| | per addition | memory per stored value | what `typeof` says |
-|---|---:|---:|---|
-| Core `decimal` | 17 ns | 16 bytes | `decimal` |
-| Embedded userdata | 68 ns | 48 bytes | `userdata` |
-| Pure Luau | 72 ns | 128 bytes | `table` |
+| | per addition, interpreter | with native code generation | memory per stored value | what `typeof` says |
+|---|---:|---:|---:|---|
+| `number` (for scale) | 2 ns | 0.8 ns | 16 bytes | `number` |
+| Core `decimal` | 17 ns | 16 ns | 16 bytes | `decimal` |
+| Embedded userdata | 69 ns | 70 ns | 48 bytes | `userdata` |
+| Pure Luau | 75 ns | 57 ns | 128 bytes | `table` |
 
-(Apple M3, interpreter, five runs each; the numbers agree to a few
-nanoseconds. With native code generation turned on the pure-Luau version drops
-to 55 ns and the core version to 16. Memory is measured as growth in
+(Apple M3, median of five runs. Memory is measured as growth in
 `collectgarbage("count")` for a million values held in an array, so it includes
-the 16-byte slot in the array.)
+the 16-byte slot. Everything about these numbers, including what native code
+generation does and does not change, is on the
+[performance page](performance.md).)
 
 Both approximations pay for an allocation per result: the userdata costs 32
 bytes of object on top of the slot, the table 112. The core type pays nothing,
 because the value lives in the slot. That is the difference between 17 ns and
-about 70, and between 16 bytes and 48 or 128. For a pricing rule that runs once
+about 70 (3.5 to 4.5 times), and between 16 bytes and 48 or 128. For a pricing rule that runs once
 per request, none of this matters. For a script that runs over a million order
 lines it is the difference between a cheap rule and a visible cost.
 

@@ -166,32 +166,20 @@ instead of only showing less of it.
 
 ## What it costs to use
 
-I measured the interpreter on an Apple M3 (single machine, two runs, the
-numbers agree to a few percent). Every decimal operation is currently a call
-into the same slow path that handles vectors and metamethods, not a dedicated
-opcode, and native code generation does not specialise it yet.
+Every decimal operation is currently a call into the same slow path that
+handles vectors and metamethods, not a dedicated opcode, and native code
+generation does not know about decimals. The result: adding two decimals takes
+about 17 ns, which is 9 times a double addition in the interpreter and 21 times
+with native code generation (only the double gets faster), with no allocation
+and no garbage. Division is the expensive operation, at about 200 ns, because it is a 128-bit
+divide inside a loop that looks for the largest scale that fits.
 
-| Operation, 10 million iterations | Time | Per operation |
-|---|---|---|
-| `number`: `x += 0.01` | 15 ms | about 1.5 ns |
-| `decimal`: `x += 0.01d` | 204 ms | about 20 ns |
-| `decimal`: `x < y` | 59 ms | about 6 ns |
-| `decimal`: `x == y` | 15 ms | about 1.5 ns |
-| `decimal.add(x, y)` as a library call | 278 ms | about 28 ns |
-| `decimal`: `round(x * 1.01d, 2)` (1 million iterations) | 46 ms | about 46 ns |
-| `decimal`: `x += y / 3d` (1 million iterations) | 204 ms | about 200 ns |
-
-So adding decimals is about 13 times slower than adding doubles, with no
-allocation and no garbage. Division is the expensive one because it is a
-128-bit divide inside a loop that looks for the largest scale that fits. None of
-this is a reason to avoid decimals for money, where correctness dominates and
-operations are rare; it would matter for a hot numeric loop, which is not what
-this type is for. The numbers are a floor for what the inline design can cost,
-and a ceiling for what it will cost once the common cases get opcodes.
-
-The array case is worth noting: a table of one million decimals summed in a
-loop takes 19 ms, because the values are stored inline in the table and the
-sum never allocates.
+None of this is a reason to avoid decimals for money, where correctness
+dominates and operations are rare; it would matter for a hot numeric loop,
+which is not what this type is for. The numbers are what the inline design costs
+before anyone has written a fast path, and the alternatives that allocate a
+heap object per result are 3.5 to 4.5 times slower still. The full tables,
+including memory, are on the [performance page](performance.md).
 
 ## Where this leaves the decision
 
