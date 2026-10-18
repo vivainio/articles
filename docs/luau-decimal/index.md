@@ -34,10 +34,12 @@ an RFC.
 - [Checked against .NET](checked-against-dotnet.md) — 72 cases run through
   both implementations, what matched, and an explanation for each of the 13
   differences.
+- [Why a 64-bit mantissa](why-64-bits.md) — the value layout, the alternatives
+  and what each costs, what the choice gives up, and a correction to my own
+  first argument.
 
-More to come: why a 64-bit mantissa, how decimals feel next to `number` and
-`integer`, and what it took to build (the file map, for anyone who has to
-maintain it).
+More to come: how decimals feel next to `number` and `integer`, and what it
+took to build (the file map, for anyone who has to maintain it).
 
 ## The same sentence, three ways
 

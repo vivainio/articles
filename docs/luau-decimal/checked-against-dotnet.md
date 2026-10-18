@@ -123,8 +123,8 @@ and scale 0 there.
    description of .NET's division rule was a guess when I wrote it down. The
    check is cheap enough to keep as part of the test suite.
 
-The next article explains why the mantissa is 64 bits and what the
-alternatives would have cost.
+The next article, [Why a 64-bit mantissa](why-64-bits.md), explains why the
+mantissa is 64 bits and what the alternatives would have cost.
 
 ## Reproducing
 
