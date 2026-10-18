@@ -287,6 +287,145 @@ may depend on a particular Lua version, a native library, or facilities supplied
 by one host. Finding a package and being able to use it inside an embedded
 application are separate steps.
 
+## Embedding in Rust and .NET
+
+Embedding means linking a runtime into your application, registering host
+functions, and running scripts inside that process. A wrapper handles value
+conversion and VM lifetimes; you still design the API scripts will use.
+
+| Host | Library | Runtime | Deployment |
+| --- | --- | --- | --- |
+| Rust | `mlua` | Luau, mainline Lua, or LuaJIT, selected by features | Native runtime; Luau builds from bundled sources |
+| .NET | NuLua | Luau, mainline Lua, or LuaJIT, selected by package | Native binaries; currently desktop platforms |
+| .NET | NLua | Mainline Lua through KeraLua | Managed wrapper plus native Lua |
+| .NET | MoonSharp | Its own Lua 5.2-oriented interpreter | Entirely managed C# |
+
+### Rust: mlua with the Luau feature
+
+[`mlua`](https://github.com/mlua-rs/mlua) supports Luau directly. Its `luau`
+feature builds the native runtime from bundled sources, so a separate system
+Luau installation is unnecessary. Optional features include `async`, `serde`,
+and `luau-jit` for native code generation.
+
+For this example, use:
+
+```toml
+[dependencies]
+mlua = { version = "=0.12.2", features = ["luau"] }
+```
+
+The host registers a Rust function, and the script calls it:
+
+```rust
+use mlua::{Lua, Result};
+
+fn main() -> Result<()> {
+    let lua = Lua::new();
+    let double = lua.create_function(|_, value: f64| Ok(value * 2.0))?;
+    lua.globals().set("double", double)?;
+    lua.sandbox(true)?;
+
+    let result: String = lua.load(r#"
+        local amount = double(21)
+        return if amount == 42 then "ok" else "unexpected"
+    "#).eval()?;
+    println!("{result}"); // ok
+    Ok(())
+}
+```
+
+[`Lua::create_function`](https://mlua.rs/mlua/struct.Lua.html) converts the
+argument into the declared Rust type and returns conversion errors through
+`mlua::Result`. `eval` similarly converts the script's result into `String`.
+Host objects can implement `UserData` to expose selected methods and fields.
+
+For asynchronous host operations, enable `async` and use the asynchronous
+execution APIs. The integration uses Lua coroutines; the application supplies
+an executor. This does not make every script operation asynchronous.
+[mlua async support](https://github.com/mlua-rs/mlua#asyncawait-support)
+
+### .NET: NuLua for Luau
+
+[NuLua](https://github.com/nuskey8/NuLua) has a `NuLua.Luau` backend, host
+callbacks, and async support. It is currently a preview supporting Windows,
+macOS, and Linux on x64 and ARM64. Mobile and web support are listed as planned.
+
+The older [luau-dotnet](https://github.com/nuskey8/luau-dotnet) project is
+archived and directs users to NuLua. Avoid starting from its old package names
+and examples.
+
+Install the packages:
+
+```bash
+dotnet add package NuLua --version 0.1.0
+dotnet add package NuLua.Luau --version 0.1.0
+```
+
+The equivalent C# host callback looks like this:
+
+```csharp
+using NuLua;
+using NuLua.Luau;
+
+using var state = LuauState.Create();
+state.OpenLibraries();
+state.RegisterFunction("double", (lua, args) =>
+{
+    lua.Push(args[0].Read<double>() * 2);
+    return 1;
+});
+
+var results = state.DoString("""
+    local amount = double(21)
+    return if amount == 42 then "ok" else "unexpected"
+    """);
+Console.WriteLine(results[0].Read<string>()); // ok
+```
+
+`Push` supplies a return value; the callback returns how many values it pushed.
+Dispose the state when finished. NuLua also provides Luau sandbox APIs and
+custom module loaders. [NuLua API examples](https://github.com/nuskey8/NuLua)
+
+Both examples were compiled and run on macOS ARM64: mlua 0.12.2 and NuLua
+0.1.0, using .NET 10. Both printed `ok`. This verifies the basic callback and
+Luau execution path on that platform.
+
+### .NET alternatives when Luau is optional
+
+[NLua](https://github.com/NLua/NLua) bridges native Lua to .NET through
+KeraLua. It exposes .NET objects and methods to scripts and suits applications
+that want mainline Lua with CLR interoperability. It is not a Luau backend;
+the Luau examples earlier in this article will not run unchanged.
+
+[MoonSharp](https://github.com/moonsharp-devs/moonsharp) implements its
+interpreter entirely in C#. It targets Lua 5.2 compatibility with documented
+differences, offers CLR object integration, and avoids shipping a native Lua
+library. Its project documents AOT and Unity IL2CPP support. It also does not
+implement Luau's syntax or type checker.
+
+For a Luau application, I would prototype with mlua in Rust or NuLua in .NET.
+NuLua's preview status makes testing deployment on the intended platforms an
+early task. If managed-only deployment is a requirement and Lua 5.2 is
+acceptable, MoonSharp is a separate option.
+
+### What the embedding library leaves to the host
+
+Luau's [sandbox documentation](https://luau.org/sandbox/) covers restricted
+libraries, read-only built-ins, separate script environments, and interruption
+of running code. A sandboxed VM still has access to whatever host callbacks
+you register. A callback that reads arbitrary files gives scripts that ability.
+
+Decide how modules are found, how much memory scripts may allocate, and how
+long they may run. Interrupting script execution also needs a policy for host
+callbacks that block or perform expensive work. These examples demonstrate
+integration; neither implements a complete resource-limited script service.
+
+Runtime execution and static analysis are separate integrations. Loading a
+script with either wrapper does not automatically run Luau's type checker.
+To check calls into your host API, supply matching Luau type declarations and
+run analysis in the editor or build pipeline. Keep runtime argument validation
+in the host callbacks as well.
+
 ## The host is part of the programming environment
 
 In a standalone program, you can select the interpreter, install modules, and control the
