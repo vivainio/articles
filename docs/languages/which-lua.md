@@ -111,30 +111,125 @@ the analysis problem.
 The changes accumulated over time; the following describes today's language,
 not a list of features delivered at its initial launch.
 
-### Types and syntax
+### If expressions
 
-Luau adds optional type annotations and a gradual type system, including
-table types, unions, intersections, generics, and type inference. It also adds
-`continue`, compound assignment, if expressions, generalized iteration, and
-string interpolation. [Luau syntax](https://luau.org/syntax/)
-
-For example, this is Luau rather than portable Lua:
+An if expression produces a value:
 
 ```lua
-local function greeting(name: string): string
-    return `Hello, {name}`
-end
-
-local total = 0
-for _, value in {10, 20, 30} do
-    total += value
-end
-
+local total = 60
 local label = if total > 50 then "large" else "small"
+print(label) -- large
 ```
 
-The type annotations are checked during development; they do not insert
-runtime argument checks.
+Standard Lua needs a statement and separate assignments:
+
+```lua
+local total = 60
+local label
+if total > 50 then
+    label = "large"
+else
+    label = "small"
+end
+```
+
+Luau requires `else` and omits `end` in the expression form. It also handles
+false values correctly, unlike the `condition and value or fallback` idiom:
+
+```lua
+local disabled = true
+local enabled = if disabled then false else true -- false
+local wrong = disabled and false or true         -- true
+```
+
+### Interpolation, assignment, and continue
+
+Backtick strings embed expressions in `{}`:
+
+```lua
+local name = "Ada"
+local count = 3
+print(`Hello, {name}: {count + 1} tasks`)
+```
+
+Compound assignments shorten updates. `continue` skips the remaining loop body:
+
+```lua
+local total = 0
+for _, value in ipairs({10, -5, 20}) do
+    if value < 0 then
+        continue
+    end
+    total += value
+end
+print(total) -- 30
+```
+
+These examples use Luau syntax; they do not run unchanged in standard Lua.
+[Luau syntax reference](https://luau.org/syntax/)
+
+### Iterating directly over tables
+
+Luau accepts a table directly after `in`:
+
+```lua
+local names = {"Ada", "Grace"}
+for index, name in names do
+    print(index, name)
+end
+```
+
+For a dense array, this visits elements in index order. Tables can also contain
+other keys; their order is unspecified after the array portion. Custom objects
+can supply an `__iter` metamethod. Existing `pairs` and `ipairs` loops still
+work. [Generalized iteration RFC](https://rfcs.luau.org/generalized-iteration.html)
+
+### Types for function boundaries and data
+
+Annotations describe parameters, return values, and table shapes. `--!strict`
+enables stricter analysis for the file:
+
+```lua
+--!strict
+
+type Task = {
+    title: string,
+    done: boolean,
+}
+
+local function describe(task: Task): string
+    return if task.done then "complete" else task.title
+end
+
+print(describe({title = "Write article", done = false}))
+-- describe({title = "Write article", done = "no"}) -- type error
+```
+
+The checker infers many types without annotations. I would start with strict
+mode and annotate function boundaries and shared data structures. Those
+annotations document what callers should supply and let the checker catch
+mistakes before execution. They do not insert runtime argument checks.
+[Luau types](https://luau.org/types/)
+
+### Table helpers
+
+Luau also extends the standard library:
+
+```lua
+local defaults = {retries = 3, timeout = 10}
+local options = table.clone(defaults)
+table.freeze(defaults)
+options.retries = 5
+
+local values = table.create(4, 0) -- four zeroes
+print(table.find({"red", "green", "blue"}, "green")) -- 2
+```
+
+`table.freeze` prevents changes to that table; nested tables remain mutable.
+`table.clone` makes a shallow, unfrozen copy, so nested tables remain shared.
+`table.create` preallocates an array, optionally filling it, and `table.find`
+returns the index of a matching array element or `nil`.
+[Luau standard library](https://luau.org/library/)
 
 ### A different implementation and sandbox
 
