@@ -15,7 +15,7 @@ the VM's ordinary 16-byte value slot, with no heap allocation. That is the wides
 mantissa that fits. I started with a 64-bit mantissa, wrote that it was the only
 layout that fits (it is not), built the arithmetic that a wider one needs, fuzzed
 it against Python, and switched. The price is some speed (an addition went from
-about 2.7 ns to about 4.9 ns) and a 256-bit arithmetic core.
+about 2.7 ns to about 4.2 ns) and a 256-bit arithmetic core.
 
 ## What a Luau value looks like
 
@@ -150,19 +150,21 @@ up.
 **Speed.** Measured on an Apple M3 (the [performance page](performance.md) has
 all the tables):
 
-| | 64-bit | 90-bit |
-|---|---:|---:|
-| same-scale addition, interpreter | 2.7 ns | 4.9 ns |
-| same-scale addition, native code generation | 2.9 ns | 6.4 ns |
-| addition with different scales | 9 ns | 28 ns |
-| `round(x * 1.01d, 2)` | 48 ns | 82 ns |
-| division plus addition | 135 ns | 286 ns |
-| comparison (same scale) | 3.1 ns | 3.1 ns |
+| | 64-bit | 90-bit, first | 90-bit, optimised |
+|---|---:|---:|---:|
+| same-scale addition, interpreter | 2.7 ns | 4.9 ns | 4.2 ns |
+| same-scale addition, native code generation | 2.9 ns | 6.4 ns | 4.2 ns |
+| addition with different scales | 9 ns | 28 ns | 15 ns |
+| `round(x * 1.01d, 2)` | 48 ns | 82 ns | 51 ns |
+| division plus addition | 135 ns | 286 ns | 123 ns |
+| comparison (same scale) | 3.1 ns | 3.1 ns | 3.5 ns |
 
-The slowdown is about a factor of 2, and it is in the operations that the 256-bit
-core now does and in packing and unpacking the split mantissa on every read and
-write. Neither has been optimised; both are obvious places to start, and the
-common case (same scale) stays in single-digit nanoseconds.
+The first 90-bit version was about twice as slow as the 64-bit one on the common
+operations, in the 256-bit core and in converting the split mantissa to and from
+a signed integer on every read and write. An optimisation pass (working on the
+packed sign and magnitude directly, an early exit in the rounding step, fewer
+divisions) got most of it back: the common case is within a factor of 1.5 of the
+64-bit version, and division is faster than it was.
 
 **Code.** The library file went from 789 to 842 lines and gained a 295-line
 helper. The special cases for results that would not fit in 128 bits are gone,
@@ -208,7 +210,7 @@ function), so supporting MSVC is a contained job. I have not done it.
 
 The GC row is still the one people reach for first, and the
 [performance page](performance.md) has a proxy for it: the host-registered
-userdata, which pays one allocation per result, is 11 to 15 times slower than the
+userdata, which pays one allocation per result, is 17 times slower than the
 inline decimal for the same addition and uses 3 times the memory.
 
 ## Where this leaves the decision

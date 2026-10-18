@@ -66,9 +66,9 @@ Then the same loop in each, additions of `0.01`, with plain `number` for scale:
 | | per addition, interpreter | with native code generation | memory per stored value | what `typeof` says |
 |---|---:|---:|---:|---|
 | `number` (for scale) | 1.5 ns | 0.7 ns | 16 bytes | `number` |
-| Core `decimal` | 4.9 ns | 6.4 ns | 16 bytes | `decimal` |
-| Embedded userdata | 72 ns | 71 ns | 48 bytes | `userdata` |
-| Pure Luau | 75 ns | 56 ns | 128 bytes | `table` |
+| Core `decimal` | 4.2 ns | 4.2 ns | 16 bytes | `decimal` |
+| Embedded userdata | 70 ns | 70 ns | 48 bytes | `userdata` |
+| Pure Luau | 76 ns | 57 ns | 128 bytes | `table` |
 
 (Apple M3, median of five runs. Memory is measured as growth in
 `collectgarbage("count")` for a million values held in an array, so it includes
@@ -78,8 +78,8 @@ generation does and does not change, is on the
 
 Both approximations pay for an allocation per result: the userdata costs 32
 bytes of object on top of the slot, the table 112. The core type pays nothing,
-because the value lives in the slot. That is the difference between 5 ns and
-about 70 (9 to 15 times), and between 16 bytes and 48 or 128. For a pricing rule that runs once
+because the value lives in the slot. That is the difference between 4 ns and
+about 70 (14 to 18 times), and between 16 bytes and 48 or 128. For a pricing rule that runs once
 per request, none of this matters. For a script that runs over a million order
 lines it is the difference between a cheap rule and a visible cost.
 
@@ -148,8 +148,8 @@ that these are things only the core can provide:
 2. **A literal and a type.** `19.99d` in source, `decimal` in annotations,
    `type(x) == "decimal"` that refines, and operators that the type checker
    understands without a per-host declaration file.
-3. **A value, not an object.** No allocation per result: a ninth to a
-   fifteenth of the time and a third to an eighth of the memory in the
+3. **A value, not an object.** No allocation per result: a fourteenth to an
+   eighteenth of the time and a third to an eighth of the memory in the
    measurements above.
 4. **Natural interplay with the types around it:** mixing with `integer`,
    sorting, comparison, constant folding, bytecode constants.
@@ -198,4 +198,5 @@ The memory figures are in `memory-core.luau`, `memory-pure.luau` and
 
 *Measured on an Apple M3 with the release build of the `decimal-type` branch.
 The host baseline truncates instead of rounding and has no division; it
-exists to be timed and compared, and I would not ship it.*
+exists to be timed and compared, and I would not ship it. A real host library,
+[`mlua-decimal`](core-vs-host-library.md), is compared in its own article.*

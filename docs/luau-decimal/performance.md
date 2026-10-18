@@ -8,20 +8,21 @@ The other articles link here instead of carrying their own tables.
 
 The short version:
 
-- **Adding two decimals takes about 5 ns: 3.3 times a double addition in the
-  interpreter, and about 9 times with native code generation.** That is after two
-  rounds of work (see "What changed since the first measurement"); the first
-  measurement of the same addition was 17 ns.
+- **Adding two decimals takes about 4 ns: 2.8 times a double addition in the
+  interpreter, and about 6 times with native code generation.** That is after
+  three rounds of work (see "What changed since the first measurement"); the
+  first measurement of the same addition was 17 ns.
 - **Native code generation helps `number` a lot and helps decimals not at all.**
   Compiled code calls a shared helper for decimal arithmetic instead of using the
   interpreter's fast path, so the gap to `number` is wider there.
-- **Against the alternatives an embedder has today, the core type is 9 to 15
+- **Against the alternatives an embedder has today, the core type is 14 to 18
   times faster and uses a third to an eighth of the memory,** because a core
   decimal lives in the value slot and the alternatives allocate a heap object for
-  every result.
-- **Division is the slowest common operation** at about 285 ns. Rounding to a
-  given scale is about 80 ns, and adding two decimals with different scales about
-  28 ns. Everything else is 15 ns or less.
+  every result. Against the real host library, `mlua-decimal`, it is about 44
+  times faster (see [the comparison](core-vs-host-library.md)).
+- **Division is the slowest common operation** at about 125 ns. Rounding to a
+  given scale is about 50 ns, and adding two decimals with different scales about
+  15 ns. Everything else is 15 ns or less.
 
 ## How it was measured
 
@@ -47,9 +48,9 @@ Luau as a table with a metatable.
 | | interpreter | native code generation |
 |---|---:|---:|
 | `number` | 1.5 ns | 0.7 ns |
-| core `decimal` | 4.9 ns | 6.4 ns |
-| host-registered userdata | 72.0 ns | 70.6 ns |
-| pure-Luau table | 75.0 ns | 56.4 ns |
+| core `decimal` | 4.2 ns | 4.2 ns |
+| host-registered userdata | 70.2 ns | 69.9 ns |
+| pure-Luau table | 76.5 ns | 56.9 ns |
 
 Read it row by row.
 
@@ -58,13 +59,13 @@ generation turns into a register add. That is why it is 2 times faster with
 codegen than without.
 
 **Core `decimal`.** In the interpreter, an addition of two decimals with the same
-scale checks the tags and scales, unpacks two 90-bit mantissas from their slots,
-adds them as 128-bit integers, checks the range, and packs the result. Compiled
-code does not have a decimal-specific path; it calls the same general arithmetic
-function the interpreter falls back to, which tries the same fast check first.
-That is why the compiled column is not faster (it is a function call on top of
-the same work). Real code generation support would put the check and the add
-inline.
+scale checks the tags and scales, adds the two 90-bit magnitudes as 128-bit
+integers (or subtracts the smaller from the larger when the signs differ), checks
+the range, and stores the result, working directly on the packed form of the
+slot. Compiled code does not have a decimal-specific path; it calls the same
+general arithmetic function the interpreter falls back to, which tries the same
+fast check first. That is why the compiled column is no faster. Real code
+generation support would put the check and the add inline.
 
 **Host-registered userdata.** The same in both modes, for a different reason:
 the cost is a call into a C function and an allocation, neither of which
@@ -80,9 +81,9 @@ The ratios that matter:
 
 | | interpreter | native code generation |
 |---|---:|---:|
-| core decimal vs `number` | 3.3 times slower | 9 times slower |
-| host userdata vs core decimal | 15 times slower | 11 times slower |
-| pure Luau vs core decimal | 15 times slower | 9 times slower |
+| core decimal vs `number` | 2.8 times slower | 6 times slower |
+| host userdata vs core decimal | 17 times slower | 17 times slower |
+| pure Luau vs core decimal | 18 times slower | 14 times slower |
 
 The first row is the cost of choosing a decimal over a double, and it is wider
 with codegen because only the double gets faster. The other two rows are the
@@ -113,47 +114,49 @@ double, for scale.
 | operation | interpreter | native code generation |
 |---|---:|---:|
 | `number`: `x += 0.01` | 1.5 ns | 0.7 ns |
-| `decimal`: `x += 0.01d` (same scale) | 4.9 ns | 6.3 ns |
-| `decimal`: `x + y`, scales 1 and 2 | 28.4 ns | 26.9 ns |
-| `decimal.add(x, y)` (library call) | 15.2 ns | 14.6 ns |
-| `decimal`: `x < y` | 3.1 ns | 4.3 ns |
-| `decimal`: `x == y` (scales 0 and 1) | 8.8 ns | 8.3 ns |
-| `decimal`: `round(x * 1.01d, 2)` | 82.3 ns | 77.0 ns |
-| `decimal`: `x += y / 3d` | 285.7 ns | 284.0 ns |
-| `decimal`: sum an array, per element | 4.7 ns | 6.3 ns |
+| `decimal`: `x += 0.01d` (same scale) | 4.2 ns | 4.1 ns |
+| `decimal`: `x + y`, scales 1 and 2 | 15.1 ns | 13.5 ns |
+| `decimal.add(x, y)` (library call) | 15.1 ns | 14.7 ns |
+| `decimal`: `x < y` | 3.5 ns | 3.2 ns |
+| `decimal`: `x == y` (scales 0 and 1) | 9.1 ns | 8.4 ns |
+| `decimal`: `round(x * 1.01d, 2)` | 50.7 ns | 44.8 ns |
+| `decimal`: `x += y / 3d` | 122.9 ns | 121.7 ns |
+| `decimal`: sum an array, per element | 4.2 ns | 4.2 ns |
 
 What the rows say:
 
 - **Same-scale arithmetic and ordering are fast.** The common case in money code
   is operands that already share a scale (cents plus cents), and that is the fast
-  path: 3 to 6 ns.
-- **Different scales cost about six times more**, 27 to 28 ns, because the operands
-  have to be aligned, added in 256 bits and rounded back.
-- **The library call is cheaper than a different-scale operator** (15 ns) and
+  path: 3 to 5 ns.
+- **Different scales cost about three to four times more**, 13 to 15 ns, because
+  the operands have to be aligned, added in 256 bits and rounded back.
+- **The library call costs the same as a different-scale operator** (15 ns) and
   three times a same-scale one, because it goes through the C function interface
   and checks its arguments. Prefer `a + b` to `decimal.add(a, b)`.
 - **Equality across scales** (`1` against `1.0`) is about 9 ns because the
   operands have to be compared numerically; with equal scales it is a single
   128-bit compare in the interpreter, which I did not time separately.
 - **Rounding is tens of nanoseconds.** The `round(..., 2)` row is a
-  multiplication, a rounding and a comparison together, and comes to about 80 ns.
-- **Division is the expensive one**, about 285 ns for a division plus an addition.
+  multiplication, a rounding and a comparison together, and comes to about 50 ns.
+- **Division is the expensive one**, about 125 ns for a division plus an addition.
   The quotient is computed in 256 bits and the largest scale that fits has to be
-  found, which takes a few 256-bit divisions.
-- **Arrays are cheap.** Summing a million decimals costs under 7 ns per element,
+  found, which takes one or two 256-bit divisions plus the removal of trailing
+  zeros.
+- **Arrays are cheap.** Summing a million decimals costs about 4 ns per element,
   about the cost of the addition itself. The values are stored inline in the
   array, so there is nothing else to touch.
 
 ## What changed since the first measurement
 
-This page has been through three versions, and the numbers moved enough that the
+This page has been through four versions, and the numbers moved enough that the
 history is part of the result.
 
-| version | same-scale addition | division plus addition |
-|---|---:|---:|
-| first prototype: 64-bit mantissa, every operation through the general function | 17 ns | 200 ns |
-| **plus** interpreter fast paths and a faster division, still 64-bit | 2.7 ns | 135 ns |
-| **now**: 90-bit mantissa, 256-bit arithmetic | 4.9 ns | 286 ns |
+| version | same-scale addition | different scales | division plus addition |
+|---|---:|---:|---:|
+| first prototype: 64-bit mantissa, every operation through the general function | 17 ns | 17 ns | 200 ns |
+| **plus** interpreter fast paths and a faster division, still 64-bit | 2.7 ns | 9 ns | 135 ns |
+| 90-bit mantissa, 256-bit arithmetic | 4.9 ns | 28 ns | 286 ns |
+| **now**: the same, optimised | 4.2 ns | 15 ns | 123 ns |
 
 **The fast paths** (second row) were an interpreter fast path for `+`, `-` and `*`
 on two decimals with the same scale, and for `<`, `<=`, `>` and `>=`: an integer
@@ -164,20 +167,27 @@ searching down from the largest. When I wrote the first version of this page I
 said the common case could be a few nanoseconds with a fast path, and that was an
 estimate. It turned out to be about right.
 
-**The widening** (third row) costs a factor of about 2 on the common operations and
-a factor of 2 to 3 on the slow ones. The 256-bit arithmetic is the main cost
-for different-scale addition, rounding and division. Packing and unpacking a mantissa
-that is split across a 64-bit and a 26-bit field is the main cost for same-scale
-addition. Neither has been optimised; both are obvious places to start. The case
-for paying it is in [Why a 90-bit mantissa](why-90-bits.md): 27 digits instead of
-19, and an 18-decimal token holds up to a billion instead of 9.2.
+**The widening** (third row) cost a factor of about 2 on the common operations and
+a factor of 2 to 3 on the slow ones. The case for paying it is in [Why a 90-bit
+mantissa](why-90-bits.md): 27 digits instead of 19, and an 18-decimal token holds
+up to a billion instead of 9.2.
+
+**The optimisation** (last row) won most of it back. The interpreter now works on the
+packed sign and magnitude directly instead of converting to a signed 128-bit
+mantissa and back, the rounding step returns immediately for a value that is already
+in range, and division does fewer 256-bit divisions (it aims for the right scale
+from the digit counts, skips the attempt at a finer scale when the quotient is too
+big to allow one, and strips trailing zeros with short divisions in chunks). A
+same-scale addition is 4.2 ns (2.7 before widening), different scales 15 ns (9), and
+division is now faster than it was at 64 bits: 123 ns against 135.
 
 What did not change across any of these steps is a result, except where the wider
 mantissa deliberately changes one (more digits). I checked that at every step: the
 13 demos produce byte-identical output in both modes, the 75 cases against .NET
 produce the expected differences, and a differential fuzzer compares millions of
 random operations against an independent implementation built on Python's
-`decimal` module.
+`decimal` module (3.8 million cases after the optimisation, with a fresh seed, and
+no mismatches).
 
 It is a good illustration of why I wanted the benchmark in the first place: the
 first version of this page said the design was 9 to 21 times slower than a double,

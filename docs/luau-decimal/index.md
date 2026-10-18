@@ -33,6 +33,9 @@ an RFC.
 
 - [Why money in Luau needs a decimal](motivation.md) — the scenario, what an
   embedder can do today (measured), and the narrow case for the core.
+- [A core type or a host library?](core-vs-host-library.md) — the same questions
+  asked of `mlua-decimal`, an exact decimal userdata for Rust hosts: what it matches
+  in .NET, what it costs, what the checker sees, and what it suggests changing.
 - [Checked against .NET](checked-against-dotnet.md) — 75 cases run through
   both implementations, what matched, and an explanation for each of the 11
   differences.

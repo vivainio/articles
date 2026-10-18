@@ -39,6 +39,7 @@ nav = [
   { "A decimal type for Luau" = [
     { "Overview" = "luau-decimal/index.md" },
     { "Why money needs a decimal" = "luau-decimal/motivation.md" },
+    { "A core type or a host library?" = "luau-decimal/core-vs-host-library.md" },
     { "Checked against .NET" = "luau-decimal/checked-against-dotnet.md" },
     { "Why a 90-bit mantissa" = "luau-decimal/why-90-bits.md" },
     { "Ergonomics" = "luau-decimal/ergonomics.md" },
