@@ -65,10 +65,10 @@ Then the same loop in each, additions of `0.01`, with plain `number` for scale:
 
 | | per addition, interpreter | with native code generation | memory per stored value | what `typeof` says |
 |---|---:|---:|---:|---|
-| `number` (for scale) | 1.7 ns | 0.7 ns | 16 bytes | `number` |
-| Core `decimal` | 2.6 ns | 2.9 ns | 16 bytes | `decimal` |
-| Embedded userdata | 70 ns | 71 ns | 48 bytes | `userdata` |
-| Pure Luau | 79 ns | 57 ns | 128 bytes | `table` |
+| `number` (for scale) | 1.5 ns | 0.7 ns | 16 bytes | `number` |
+| Core `decimal` | 4.9 ns | 6.4 ns | 16 bytes | `decimal` |
+| Embedded userdata | 72 ns | 71 ns | 48 bytes | `userdata` |
+| Pure Luau | 75 ns | 56 ns | 128 bytes | `table` |
 
 (Apple M3, median of five runs. Memory is measured as growth in
 `collectgarbage("count")` for a million values held in an array, so it includes
@@ -78,8 +78,8 @@ generation does and does not change, is on the
 
 Both approximations pay for an allocation per result: the userdata costs 32
 bytes of object on top of the slot, the table 112. The core type pays nothing,
-because the value lives in the slot. That is the difference between 3 ns and
-about 70 (20 to 30 times), and between 16 bytes and 48 or 128. For a pricing rule that runs once
+because the value lives in the slot. That is the difference between 5 ns and
+about 70 (9 to 15 times), and between 16 bytes and 48 or 128. For a pricing rule that runs once
 per request, none of this matters. For a script that runs over a million order
 lines it is the difference between a cheap rule and a visible cost.
 
@@ -114,7 +114,7 @@ whether it was handed an amount has to look for the metatable. Mistakes surface
 as `attempt to index number with 's'`, which names a field that nobody typed.
 
 **The host-embedded version fixes the representation problems** (it is a real
-64-bit mantissa, `typeof` is `userdata`, nothing is editable), and that is
+integer mantissa, `typeof` is `userdata`, nothing is editable), and that is
 the version I would build if I owned one application. But it brings its own:
 
 - **There is no literal.** Every constant is a call, `Decimal.parse("19.99")`,
@@ -148,16 +148,16 @@ that these are things only the core can provide:
 2. **A literal and a type.** `19.99d` in source, `decimal` in annotations,
    `type(x) == "decimal"` that refines, and operators that the type checker
    understands without a per-host declaration file.
-3. **A value, not an object.** No allocation per result: a twentieth to a
-   thirtieth of the time and a third to an eighth of the memory in the
+3. **A value, not an object.** No allocation per result: a ninth to a
+   fifteenth of the time and a third to an eighth of the memory in the
    measurements above.
 4. **Natural interplay with the types around it:** mixing with `integer`,
    sorting, comparison, constant folding, bytecode constants.
 
 The natural objection is that the core should stay small. I agree with the
-instinct, and it is why the implementation is organised the way it is: 55 files
-touched, median change of ten lines, one new 760-line library file, and almost
-all of the rest a `case` next to the one `integer` already has
+instinct, and it is why the implementation is organised the way it is: 57 files
+touched, median change of ten lines, a new library file and a 300-line integer
+helper, and almost all of the rest a `case` next to the one `integer` already has
 ([the walkthrough](implementation-walkthrough.md) has the detail). A new
 primitive is not free, but the price is mostly paid once.
 
@@ -171,9 +171,9 @@ primitive is not free, but the price is mostly paid once.
 - If there is no real demand beyond mine, the embedded version is a perfectly
   good answer for one host. The core type is worth it when there are several
   hosts and several people writing scripts.
-- If a decimal this narrow (about 19 digits, see
-  [the 64-bit article](why-64-bits.md)) is not enough, the design question
-  moves to the mantissa width and not to whether the type should exist.
+- If a decimal this narrow (27 to 28 digits, see
+  [the 90-bit article](why-90-bits.md)) is not enough, the design question
+  moves to the representation and not to whether the type should exist.
 
 ## Reproducing
 

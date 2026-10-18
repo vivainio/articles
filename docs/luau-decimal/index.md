@@ -24,7 +24,7 @@ an RFC.
 - A `decimal` value type with literals (`19.99d`), the usual operators, a
   `decimal` library, and static types in both Luau type checkers.
 - Semantics copied from .NET's `System.Decimal`, with one deliberate
-  deviation: a 64-bit mantissa, so about 19 digits instead of 28.
+  deviation: a 90-bit mantissa, so 27 digits (28 up to 1.24e27) instead of 28 to 29.
 - A [demo suite](https://github.com/vivainio/luau/tree/decimal-type/demos/decimal)
   of 13 runnable scripts with committed expected output, which doubles as the
   specification of what the implementation does today.
@@ -33,12 +33,12 @@ an RFC.
 
 - [Why money in Luau needs a decimal](motivation.md) — the scenario, what an
   embedder can do today (measured), and the narrow case for the core.
-- [Checked against .NET](checked-against-dotnet.md) — 72 cases run through
-  both implementations, what matched, and an explanation for each of the 13
+- [Checked against .NET](checked-against-dotnet.md) — 75 cases run through
+  both implementations, what matched, and an explanation for each of the 11
   differences.
-- [Why a 64-bit mantissa](why-64-bits.md) — the value layout, the alternatives
-  and what each costs, what the choice gives up, and a correction to my own
-  first argument.
+- [Why a 90-bit mantissa](why-90-bits.md) — the value layout, how a 64-bit first
+  version became 90 bits, the 256-bit arithmetic behind it, what it costs, and
+  how it was tested.
 - [Performance at a glance](performance.md) — every speed and memory number
   in the series on one page, interpreter and native code generation.
 - [How decimals feel next to number, integer and vector](ergonomics.md) — an

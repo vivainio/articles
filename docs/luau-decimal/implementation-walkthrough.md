@@ -21,22 +21,22 @@ Against upstream at the point I forked:
 
 | Area | Files | Lines added |
 |---|---:|---:|
-| VM (`VM/`) | 15 | 1,027 |
-| Analysis (the type checker) | 22 | 242 |
-| Parser and AST (`Ast/`) | 6 | 159 |
-| Bytecode | 5 | 76 |
-| Compiler | 5 | 67 |
-| Common, build | 2 | 2 |
-| **Source total** | **55** | **1,573** (16 removed) |
-| Tests | 9 | 576 |
-| Demo suite | 33 | 2,237 |
+| VM (`VM/`) | 16 | 1,531 |
+| Analysis (the type checker) | 22 | 244 |
+| Parser and AST (`Ast/`) | 6 | 162 |
+| Bytecode | 5 | 80 |
+| Compiler | 5 | 68 |
+| Common, build | 3 | 65 |
+| **Source total** | **57** | **2,150** (16 removed) |
+| Tests | 9 | 592 |
+| Demo suite and fuzzers | 48 | 3,401 |
 
-Two numbers say more than the total. One file, the new `ldeclib.cpp`, is 760 of
-those lines. And the median change across the 55 files is **10 lines**: 30
-files changed by 10 lines or fewer, 43 by 20 or fewer, and only two others
-(the parser at 99 and the VM's arithmetic slow path at 92) are over 50. A type
-that touches 55 files sounds invasive. Almost all of it is one `case` in a
-`switch` that was already enumerating the types.
+Two numbers say more than the total. Two new files, `ldeclib.cpp` (842 lines) and
+the 256-bit integer helper `lwide.h` (295), are over half of those lines. And the
+median change across the 57 files is **10 lines**; besides those two, only the
+parser (99), the VM's arithmetic slow path (92) and the interpreter's fast paths
+(66) are over 50. A type that touches 57 files sounds invasive. Almost all of it
+is one `case` in a `switch` that was already enumerating the types.
 
 ## Where it lines up with `integer`
 
@@ -46,28 +46,30 @@ The tag goes in the `lua_Type` enum, next to `LUA_TINTEGER`:
 
 ```c
 LUA_TINTEGER,
-LUA_TDECIMAL, // int64 mantissa in Value::l, int32 exponent in TValue::extra[0]
+LUA_TDECIMAL, // 90-bit mantissa, sign and scale, packed into Value::l and TValue::extra[0]
 ```
 
-and a value is written with a macro that mirrors `setlvalue`:
+and a value is written by a small inline function behind the same kind of macro
+that `setlvalue` uses:
 
 ```c
-#define setdecvalue(obj, m, e) \
-    { \
-        TValue* i_o = (obj); \
-        i_o->value.l = (m); \
-        i_o->extra[0] = (e); \
-        i_o->tt = LUA_TDECIMAL; \
-    }
+static inline void luaO_setdec(TValue* o, DecimalMantissa m, int e)
+{
+    bool negative;
+    uint64_t hi, lo;
+    decimalMantissaSplit(m, &negative, &hi, &lo);
+
+    o->value.l = int64_t(lo);
+    o->extra[0] = int(uint32_t(hi) | (uint32_t(-e) << 26) | (negative ? 0x80000000u : 0u));
+    o->tt = LUA_TDECIMAL;
+}
 ```
 
-The mantissa reuses the field `integer` already uses, and the exponent goes in
-`extra`, the slot that holds a vector's third component. The enum comment says
-that changing its order has consequences ("grep ORDER TYPE"), and it does:
-inserting a tag shifts the numeric value of every type after it, which an
-embedder that hard-codes `lua_type` results would notice. `integer` did exactly
-the same thing when it arrived, so there is a precedent, but it is a line item
-for the changelog.
+A decimal is a 90-bit mantissa, a 5-bit scale and a sign. The low 64 bits of the
+magnitude go where `integer` keeps its value, and the high 26 bits, the scale and
+the sign share the `extra` slot that holds a vector's third component:
+64 + 26 + 5 + 1 = 96 bits, exactly the payload. The reasoning for 90 bits is in
+[its own article](why-90-bits.md).
 
 ### Source text to AST (6 files, the same six)
 
@@ -103,15 +105,16 @@ format gets a new constant kind:
 case LBC_CONSTANT_DECIMAL:
 {
     bool isNegative = read<uint8_t>(data, size, offset);
-    uint64_t magnitude = readVarInt64(data, size, offset);
-    bool isNegativeExp = read<uint8_t>(data, size, offset);
-    int exp = int(readVarInt(data, size, offset));
-    setdecvalue(&p->k[j], isNegative ? (int64_t)(~magnitude + 1) : (int64_t)magnitude, isNegativeExp ? -exp : exp);
+    uint64_t hi = readVarInt64(data, size, offset);
+    uint64_t lo = readVarInt64(data, size, offset);
+    int scale = int(readVarInt(data, size, offset));
+    setdecvalue(&p->k[j], decimalMantissaJoin(isNegative, hi, lo), -scale);
     break;
 }
 ```
 
-which is `LBC_CONSTANT_INTEGER` with a second sign-and-varint for the exponent.
+which is `LBC_CONSTANT_INTEGER` with the magnitude split into two halves and a scale
+after it.
 Two decimals that are equal but have different scales (`1.5d` and `1.50d`) are
 different constants on purpose, because the scale is part of the value's text.
 The compiler's constant folder, however, must treat them as equal for `==`;
@@ -149,10 +152,10 @@ not done and would need to for a complete job:
 
 CodeGen is the one that matters. It is the largest block of `integer` work and
 the one place where decimal would need a real design: the register-level
-representation is a 64-bit payload plus a separate exponent, and the IR has no
-notion of a two-field value. I did not attempt it. The consequence is exactly
-the performance profile in the [64-bit article](why-64-bits.md): correct
-everywhere, fast nowhere.
+representation is a split 90-bit mantissa plus a scale in a second word, and the
+IR has no notion of a multi-field value. I did not attempt it. The consequence is
+the compiled column of the [performance page](performance.md): correct
+everywhere, no faster than the interpreter.
 
 ## Where decimal had to go further
 
@@ -168,7 +171,7 @@ template ran out.
   ```cpp
   if (LUAU_UNLIKELY(ttisdecimal(rb) || ttisdecimal(rc)))
   {
-      int64_t mb, mc, m = 0;
+      DecimalMantissa mb, mc, m = 0;
       int eb, ec, e = 0;
 
       if (decimalOperand(rb, &mb, &eb) && decimalOperand(rc, &mc, &ec))
@@ -176,11 +179,12 @@ template ran out.
 
   `decimalOperand` also accepts an `integer`, which is the whole of "decimals
   mix with integers".
-- **The library (`ldeclib.cpp`, 760 lines against `lintlib.cpp`'s 614).** About
-  half is a numeric core (`reducewide`, `addaligned`, `luai_decdiv`) and the
-  rest is the usual argument checking and registration. The core is the part
-  that deserves a reviewer's time; the [first article](checked-against-dotnet.md)
-  is the evidence for it.
+- **The library (`ldeclib.cpp`, 842 lines against `lintlib.cpp`'s 614, plus the
+  295-line `lwide.h`).** About a third is a numeric core (`reduce`, `addSub`,
+  `luai_decdiv`) written against the 256-bit helper, and the rest is the usual
+  argument checking and registration. The core is the part that deserves a
+  reviewer's time. Its evidence is a differential fuzzer against Python (see
+  below) and the [.NET comparison](checked-against-dotnet.md).
 - **Typing the operators.** There is no `__add` on a primitive to look at, so
   the operators are declared as metamethods on a metatable attached to the
   `decimal` primitive, the same mechanism strings use. That needed
@@ -247,19 +251,51 @@ answer; the rest were failures of tests that already existed. The existing suite
 did most of the work, and the demo suite and the cross-type comparison caught
 the two the suite had no opinion about (the linter and `table.find`).
 
+Widening the mantissa from 64 to 90 bits later added a different kind of
+surprise, found by the fuzzer rather than the suite: a quotient that rounds to
+zero is plain `0` in .NET and I had it at the preferred scale; a number just above
+the largest mantissa could be rounded to tens instead of overflowing; and one
+rounding path could round twice. All three are fixed, each has a test, and the
+rules are written down at the top of `decimal-fuzz.py`.
+
+## The 256-bit helper and how it was tested
+
+The arithmetic core needs integers wider than 128 bits, so it sits on a small
+portable helper (`VM/src/lwide.h`): eight 32-bit limbs, add, subtract, compare,
+multiply, division with remainder (Knuth's algorithm D), powers of ten and a digit
+count. It was written and tested before anything else changed.
+
+There are two fuzzers, and they check different things:
+
+- `wide-fuzz.py` runs the helper's operations against Python integers: 2.7
+  million cases, including operands made only of boundary limbs (0, 1,
+  0x7FFFFFFF, 0x80000000, 0xFFFFFFFF) that reach the rare correction step in
+  division. It was mutation-tested: four deliberately broken versions were all
+  caught.
+- `decimal-fuzz.py` runs every decimal operation in Luau (operators and library
+  functions, interpreter and native code generation, mixing with integers,
+  parsing) against a reference built on Python's `decimal` module. A run of 3.8
+  million cases found no mismatches, and replacing half-even with half-up in one
+  function made 738 of 235,500 cases fail.
+
+Together with the demos and the 6,019 unit tests, that is the evidence I would
+want before trusting the arithmetic.
+
 ## What a reviewer should read
 
 If you only have an hour, read these, in this order:
 
-1. `VM/src/ldeclib.cpp`, the first 300 lines (`reducewide`, `addaligned`,
-   `luai_decdiv`). Everything else is plumbing.
-2. `VM/src/lvmutils.cpp`, the decimal block in `luaV_doarithimpl` and the two
+1. `VM/src/ldeclib.cpp`, the first 300 lines (`reduce`, `addSub`,
+   `luai_decdiv`), then the rules at the top of
+   `demos/decimal/reference/decimal-fuzz.py`. Everything else is plumbing.
+2. `VM/src/lwide.h`, only `wideDivMod`. The rest is a few lines each.
+3. `VM/src/lvmutils.cpp`, the decimal block in `luaV_doarithimpl` and the two
    ordering functions.
-3. `Analysis/src/GlobalTypes.cpp` and `makeDecimalMetatable` in
+4. `Analysis/src/GlobalTypes.cpp` and `makeDecimalMetatable` in
    `BuiltinDefinitions.cpp`, for how the operators are typed.
-4. The diff of `Ast/src/Parser.cpp`, for the literal rules.
+5. The diff of `Ast/src/Parser.cpp`, for the literal rules.
 
-For the remaining 50-odd files, the diff is the review: it is a list of
+For the remaining 50 or so files, the diff is the review: it is a list of
 `case`s next to the same `case` for `integer`.
 
 ## What it costs to own
@@ -269,16 +305,21 @@ For the remaining 50-odd files, the diff is the review: it is a list of
   conflicts will be real but mechanical. The one that will not be mechanical is `LBC_CONSTANT_DECIMAL`:
   if upstream adds a constant kind, we both want the next number.
 - **The ABI note** above (type numbering) and the unstable
-  `lua_pushdecimal(L, int64_t mantissa, int exponent)`.
+  `lua_pushdecimal(L, negative, hi, lo, exponent)`, which passes the sign and the two
+  halves of the 90-bit magnitude.
 - **CodeGen,** whenever someone wants decimals to be fast.
-- **A 760-line library** whose arithmetic needs `__int128`, which MSVC does not
-  have.
+- **An 842-line library and a 295-line helper.** The arithmetic is portable. The
+  one place that is not is the `DecimalMantissa` typedef (`__int128`), which carries
+  mantissas through the parser, compiler and bytecode, plus an overflow-checking
+  multiply in the interpreter's fast path; MSVC would need both replaced.
 
 ## Reproducing
 
 ```bash
 git clone https://github.com/vivainio/luau && cd luau
 git diff --stat 9d7748a4..origin/decimal-type -- VM Ast Bytecode Common Compiler Analysis
+python3 demos/decimal/reference/wide-fuzz.py
+python3 demos/decimal/reference/decimal-fuzz.py
 # the bug list is the history of the tests: tests/conformance/decimal.luau,
 # tests/Parser.test.cpp, tests/Compiler.test.cpp, tests/TypeInfer.primitives.test.cpp
 ```
