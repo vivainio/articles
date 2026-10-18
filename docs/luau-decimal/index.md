@@ -31,21 +31,22 @@ an RFC.
 
 ## Articles
 
+- [Why money in Luau needs a decimal](motivation.md) — the scenario, what an
+  embedder can do today (measured), and the narrow case for the core.
 - [Checked against .NET](checked-against-dotnet.md) — 72 cases run through
   both implementations, what matched, and an explanation for each of the 13
   differences.
 - [Why a 64-bit mantissa](why-64-bits.md) — the value layout, the alternatives
   and what each costs, what the choice gives up, and a correction to my own
   first argument.
-
 - [How decimals feel next to number, integer and vector](ergonomics.md) — an
   operation-by-operation comparison, the mixing rules, the error messages, the
   editor experience, and the costs you can feel.
+- [What it took to build: a walkthrough](implementation-walkthrough.md) — the
+  implementation layer by layer, where it lines up with `integer`, and the ten
+  things the template did not predict.
 
-More to come: what it took to build (the file map, for anyone who has to
-maintain it).
-
-## The same sentence, three ways
+## A taste
 
 ```lua
 local total = 19.99d * 3d                 -- 59.97
@@ -55,4 +56,5 @@ print(decimal.round(total * 0.24d, 2))    -- 14.39
 
 The first line is exact because `19.99d` is a decimal literal and not a binary
 approximation of one. That is the whole pitch; the rest is making sure the
-details hold up.
+details hold up, and [the first article](motivation.md) says what the pitch is
+for.
