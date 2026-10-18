@@ -65,10 +65,10 @@ Then the same loop in each, additions of `0.01`, with plain `number` for scale:
 
 | | per addition, interpreter | with native code generation | memory per stored value | what `typeof` says |
 |---|---:|---:|---:|---|
-| `number` (for scale) | 2 ns | 0.8 ns | 16 bytes | `number` |
-| Core `decimal` | 17 ns | 16 ns | 16 bytes | `decimal` |
-| Embedded userdata | 69 ns | 70 ns | 48 bytes | `userdata` |
-| Pure Luau | 75 ns | 57 ns | 128 bytes | `table` |
+| `number` (for scale) | 1.7 ns | 0.7 ns | 16 bytes | `number` |
+| Core `decimal` | 2.6 ns | 2.9 ns | 16 bytes | `decimal` |
+| Embedded userdata | 70 ns | 71 ns | 48 bytes | `userdata` |
+| Pure Luau | 79 ns | 57 ns | 128 bytes | `table` |
 
 (Apple M3, median of five runs. Memory is measured as growth in
 `collectgarbage("count")` for a million values held in an array, so it includes
@@ -78,8 +78,8 @@ generation does and does not change, is on the
 
 Both approximations pay for an allocation per result: the userdata costs 32
 bytes of object on top of the slot, the table 112. The core type pays nothing,
-because the value lives in the slot. That is the difference between 17 ns and
-about 70 (3.5 to 4.5 times), and between 16 bytes and 48 or 128. For a pricing rule that runs once
+because the value lives in the slot. That is the difference between 3 ns and
+about 70 (20 to 30 times), and between 16 bytes and 48 or 128. For a pricing rule that runs once
 per request, none of this matters. For a script that runs over a million order
 lines it is the difference between a cheap rule and a visible cost.
 
@@ -148,9 +148,9 @@ that these are things only the core can provide:
 2. **A literal and a type.** `19.99d` in source, `decimal` in annotations,
    `type(x) == "decimal"` that refines, and operators that the type checker
    understands without a per-host declaration file.
-3. **A value, not an object.** No allocation per result: about a quarter of the
-   time and a third to an eighth of the memory in the measurements above, and
-   the room to make it faster later.
+3. **A value, not an object.** No allocation per result: a twentieth to a
+   thirtieth of the time and a third to an eighth of the memory in the
+   measurements above.
 4. **Natural interplay with the types around it:** mixing with `integer`,
    sorting, comparison, constant folding, bytecode constants.
 

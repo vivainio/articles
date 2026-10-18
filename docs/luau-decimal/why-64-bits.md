@@ -166,20 +166,22 @@ instead of only showing less of it.
 
 ## What it costs to use
 
-Every decimal operation is currently a call into the same slow path that
-handles vectors and metamethods, not a dedicated opcode, and native code
-generation does not know about decimals. The result: adding two decimals takes
-about 17 ns, which is 9 times a double addition in the interpreter and 21 times
-with native code generation (only the double gets faster), with no allocation
-and no garbage. Division is the expensive operation, at about 200 ns, because it is a 128-bit
-divide inside a loop that looks for the largest scale that fits.
+A core decimal lives in the value slot, so an addition allocates nothing and
+produces no garbage. With a fast path in the interpreter for operands that
+already share a scale (cents plus cents, the common case in money code), adding
+two decimals takes about 2.7 ns: 1.6 times a double addition. With native code
+generation the double gets faster and the decimal does not, which makes it
+about 4 times. Operands with different scales take a general path at about
+9 ns, rounding to a scale about 40 ns, and division is the slow operation at
+about 130 ns because it works in 128 bits and has to find the largest scale
+that fits.
 
 None of this is a reason to avoid decimals for money, where correctness
-dominates and operations are rare; it would matter for a hot numeric loop,
-which is not what this type is for. The numbers are what the inline design costs
-before anyone has written a fast path, and the alternatives that allocate a
-heap object per result are 3.5 to 4.5 times slower still. The full tables,
-including memory, are on the [performance page](performance.md).
+dominates and operations are rare. The alternatives that allocate a heap object
+per result (a host-registered userdata, or a table written in Luau) are 20 to
+30 times slower than the inline design for the same addition. The full tables,
+including memory and what changed after the first measurement, are on the
+[performance page](performance.md).
 
 ## Where this leaves the decision
 
