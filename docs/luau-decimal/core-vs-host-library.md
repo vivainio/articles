@@ -81,7 +81,7 @@ The same probe I ran against `number`, `integer`, `decimal` and `vector`
 | `` `{a}` `` and `tostring(a)` | ✓ | ✓ |
 | `table.sort({a, a})` | ✓ | ✓ |
 | `table.find({a}, a)` | ✓ | ✓ |
-| `t[a] = 1` as a table key | ✗ (an error) | accepted, but keyed by identity |
+| `t[a] = 1` as a table key | ✗ (an error) | accepted, but keyed by identity (`t[a:key()]` is the workaround) |
 | `math.max`, `string.format("%s")` | ✗ | ✗ |
 
 One row deserves a note. A userdata as a table key does not raise: it is accepted,
@@ -93,32 +93,40 @@ produces wrong results, and I think the error is the better of the two.
 ## Against .NET
 
 I ran the same 75 hand-picked cases from the [.NET comparison](checked-against-dotnet.md)
-through `mlua-decimal` (translated with `1.5d` becoming `D"1.5"`). Both end up at 64
-identical and 11 different, but the differences are different ones.
+through `mlua-decimal` (translated with `1.5d` becoming `D"1.5"`). The first run
+gave 64 identical and 11 different, and the differences were informative enough
+that I sent a pull request to the crate with the fixes; it is merged, and the table
+below is the before and after.
 
-**mlua-decimal differs from .NET in:**
+| Case | .NET | mlua-decimal before | after the pull request |
+|---|---|---|---|
+| `0.00 + 1.5` | `1.50` | `1.5` | `1.50` |
+| `0 * 123.456` | `0.000` | `0` | `0.000` |
+| `-0.00` | `0.00` | `-0.00` (a negative zero) | `0.00` |
+| `min(1.50, 1.5)` | `1.5` | `1.50` | `1.5` |
+| `D(0.1)`, `D(1/3)`, `D(1e-30)` | converts | error, by design | `D.from_float(...)` converts (`D(0.1)` is still an error) |
+| `1/2` | `0.5` | `0.50` | `0.50` |
+| `10/4` | `2.5` | `2.50` | `2.50` |
+| `0.00/5` | `0.00` | `0` | `0` |
+| `1/0` | `DivideByZeroException` | an error with different text | the same |
 
-| Case | .NET | mlua-decimal |
-|---|---|---|
-| `1/2` | `0.5` | `0.50` |
-| `10/4` | `2.5` | `2.50` |
-| `0.00/5` | `0.00` | `0` |
-| `0.00 + 1.5` | `1.50` | `1.5` |
-| `0 * 123.456` | `0.000` | `0` |
-| `-0.00` | `0.00` | `-0.00` (a negative zero) |
-| `min(1.50, 1.5)` | `1.5` | `1.50` |
-| `D(0.1)`, `D(1/3)`, `D(1e-30)` | converts | error, by design |
-| `1/0` | `DivideByZeroException` | an error with different text |
+The first four rows are fixed. The crate's README says "the scale is kept", and
+`rust_decimal` quietly drops the scale of a result when an operand is zero, so
+those were bugs relative to its own promise. The conversion is now available as an
+explicit call. What remains is the division scale: the crate follows
+`rust_decimal` (`10/4` is `2.50`), .NET removes the trailing zeros down to the
+preferred scale (`2.5`), and the crate's tests and docs assert the first, so I left
+it for the author to decide. After the change the crate differs from .NET in 6 of
+the 75 lines.
 
 **The core type differs from .NET in:** the 28th digit of non-terminating quotients
 (27 digits against 28), a range 64 times smaller, the double conversion (2 cases),
 and the error text.
 
-Read the two lists as opposites. `rust_decimal` has the full 28 to 29 digits and the
+Read the two as opposites. `rust_decimal` has the full 28 to 29 digits and the
 .NET range, which the core type gives up for the 12-byte value slot. The core type
-has the .NET *rules* (preferred scale in division, zero keeps its scale, no negative
-zero, quotients that underflow are `0`), which `rust_decimal` gets slightly
-differently. If you need every digit of .NET's range today, the crate is the better
+has the .NET *rule* for division (preferred scale, quotients that underflow are `0`),
+which `rust_decimal` does differently. If you need every digit of .NET's range today, the crate is the better
 answer. If you need the same answers as .NET on money-shaped inputs, the core type
 is closer.
 
