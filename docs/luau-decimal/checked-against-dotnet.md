@@ -1,6 +1,6 @@
 # Checked against .NET
 
-*2026-10-18 · draft*
+*2026-10-18*
 
 If a new numeric type claims to behave "like .NET's `decimal`", the claim
 should be tested, not asserted. .NET is installed on my machine, so I did the

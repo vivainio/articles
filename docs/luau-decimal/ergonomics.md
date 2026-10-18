@@ -1,6 +1,6 @@
 # How decimals feel next to number, integer and vector
 
-*2026-10-18 · draft*
+*2026-10-18*
 
 A new value type is only worth having if people can write ordinary code with
 it. This article is about that: how much of the language works on a `decimal`,

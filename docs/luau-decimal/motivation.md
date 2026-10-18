@@ -1,6 +1,6 @@
 # Why money in Luau needs a decimal
 
-*2026-10-18 · draft*
+*2026-10-18*
 
 Luau is a scripting language that other programs embed. People reach for it
 when an application needs behaviour that can change without a redeploy, can be

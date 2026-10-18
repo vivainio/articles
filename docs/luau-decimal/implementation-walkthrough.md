@@ -1,6 +1,6 @@
 # What it took to build: a walkthrough
 
-*2026-10-18 · draft*
+*2026-10-18*
 
 This is the article for whoever would have to maintain a `decimal` type: where
 the change lands, why it lands there, and what I only learned by running

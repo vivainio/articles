@@ -1,6 +1,6 @@
 # Why a 64-bit mantissa
 
-*2026-10-18 · draft*
+*2026-10-18*
 
 .NET's `decimal` has 28 or 29 significant digits. The Luau prototype has 18 or
 19. That is the largest deliberate difference between them, so it deserves a
