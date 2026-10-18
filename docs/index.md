@@ -50,6 +50,8 @@ understand.](infrastructure/index.md)
 
 ## Latest notes
 
+- [Which Lua?](languages/which-lua.md) — the language, its runtimes, and its
+  surroundings: governance, compatibility, LuaJIT, Luau, and tooling.
 - [Everyday Shortcuts](learning-mac/everyday-shortcuts.md) —
   what Command and Option do, the shortcuts to learn first, and launching
   everything from Spotlight.

@@ -36,6 +36,10 @@ nav = [
     { "Packaging Rust Apps to PyPI" = "building/packaging-rust-to-pypi.md" },
     { "Python Standard Library Web Server" = "building/python-stdlib-webserver/index.md" },
   ] },
+  { "Languages & runtimes" = [
+    { "Overview" = "languages/index.md" },
+    { "Which Lua?" = "languages/which-lua.md" },
+  ] },
   { "A decimal type for Luau" = [
     { "Overview" = "luau-decimal/index.md" },
     { "Why money needs a decimal" = "luau-decimal/motivation.md" },
