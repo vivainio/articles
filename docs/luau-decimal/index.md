@@ -38,8 +38,12 @@ an RFC.
   and what each costs, what the choice gives up, and a correction to my own
   first argument.
 
-More to come: how decimals feel next to `number` and `integer`, and what it
-took to build (the file map, for anyone who has to maintain it).
+- [How decimals feel next to number, integer and vector](ergonomics.md) — an
+  operation-by-operation comparison, the mixing rules, the error messages, the
+  editor experience, and the costs you can feel.
+
+More to come: what it took to build (the file map, for anyone who has to
+maintain it).
 
 ## The same sentence, three ways
 

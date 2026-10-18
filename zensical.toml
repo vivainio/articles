@@ -40,6 +40,7 @@ nav = [
     { "Overview" = "luau-decimal/index.md" },
     { "Checked against .NET (draft)" = "luau-decimal/checked-against-dotnet.md" },
     { "Why a 64-bit mantissa (draft)" = "luau-decimal/why-64-bits.md" },
+    { "Ergonomics (draft)" = "luau-decimal/ergonomics.md" },
   ] },
   { "Infrastructure experiments" = [
     { "Overview" = "infrastructure/index.md" },
