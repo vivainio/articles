@@ -12,6 +12,9 @@ ones can be removed without giving up the useful parts.
 - [Ejecting Serverless with Jsonnet](jsonnet-cloudformation/index.md) —
   replacing framework-generated CloudFormation with a small Jsonnet library
   and templates you can inspect directly.
+- [CloudFormation with Python TypedDicts](python-typeddict-cloudformation/index.md) —
+  the same "helpers return plain data" idea in Python, with a type checker
+  catching property typos before CloudFormation does.
 - [Document Processing Pipeline with Lambda Durable Functions](document-pipeline-durable-functions.md) —
   checkpointed steps, bounded fan-out, and a human-approval wait, written as
   one plain function instead of a Step Functions state machine.
