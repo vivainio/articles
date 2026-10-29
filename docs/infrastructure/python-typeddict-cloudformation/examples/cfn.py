@@ -5,7 +5,7 @@ type checker only; at runtime they are ordinary dicts, so json.dumps works
 directly.
 """
 
-from typing import Any, NotRequired, TypedDict
+from typing import Any, NotRequired, TypedDict, Unpack
 
 # ── Intrinsic functions ──────────────────────────────────────────────────────
 # "Fn::GetAtt" is not a valid identifier, so these use the functional syntax.
@@ -79,15 +79,24 @@ class Role(TypedDict):
     Properties: RoleProps
 
 
+class Code(TypedDict):
+    S3Bucket: str
+    S3Key: str
+
+
+class Environment(TypedDict):
+    Variables: dict[str, str]
+
+
 class FunctionProps(TypedDict):
     FunctionName: str
     Handler: str
     Runtime: str
     Role: Value
-    Code: dict[str, str]
+    Code: Code
     MemorySize: NotRequired[int]
     Timeout: NotRequired[int]
-    Environment: NotRequired[dict[str, dict[str, str]]]
+    Environment: NotRequired[Environment]
     ReservedConcurrentExecutions: NotRequired[int]
     Tags: NotRequired[list[Tag]]
 
@@ -159,7 +168,7 @@ def lambda_role(name_prefix: str, extra: list[Statement]) -> Role:
     }
 
 
-def function(props: FunctionProps) -> Function:
+def function(**props: Unpack[FunctionProps]) -> Function:
     return {"Type": "AWS::Lambda::Function", "Properties": props}
 
 

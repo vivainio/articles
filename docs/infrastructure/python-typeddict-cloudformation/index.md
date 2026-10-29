@@ -15,7 +15,7 @@ template generator, and its output is plain JSON you can diff.
 ## Contents
 
 - [The idea](#the-idea) — helpers return typed dicts
-- [The library](#the-library) — intrinsics, resources, factories
+- [The library](#the-library) — intrinsics, resources, factories, kwargs
 - [The example](#the-example) — the SQS worker from the Jsonnet article
 - [What the type checker catches](#what-the-type-checker-catches)
 - [Comparison with Jsonnet](#comparison-with-jsonnet)
@@ -77,7 +77,7 @@ class FunctionProps(TypedDict):
     Handler: str
     Runtime: str
     Role: Value
-    Code: dict[str, str]
+    Code: Code
     MemorySize: NotRequired[int]
     Timeout: NotRequired[int]
     ReservedConcurrentExecutions: NotRequired[int]
@@ -86,6 +86,28 @@ class FunctionProps(TypedDict):
 Resource = Queue | Role | Function | EventSourceMapping
 Resources = dict[str, Resource]
 ```
+
+### Keyword arguments instead of dict literals
+
+A properties `TypedDict` can also type a function's `**kwargs` with
+`Unpack` ([PEP 692](https://peps.python.org/pep-0692/), Python 3.12 or
+`typing_extensions`). The factory then takes properties as keyword arguments,
+and the type checker still validates every name, type and required key:
+
+```python
+def function(**props: Unpack[FunctionProps]) -> Function:
+    return {"Type": "AWS::Lambda::Function", "Properties": props}
+```
+
+Nested structures work the same way: a `TypedDict` class is callable with
+keyword arguments and returns a plain dict, so `Code(S3Bucket="b", S3Key="k")`
+is checked like a constructor but costs nothing at runtime. The result has no
+quoted keys and no braces except where a value is a genuine free-form map.
+
+Where kwargs do not fit, keep dict literals: intrinsic keys such as
+`"Fn::GetAtt"` are not identifiers (use helper functions like `get_att`), and
+a conditionally built dict still needs `**props`, which is checked less
+strictly.
 
 Factories keep the ordinary Python-function feel of Jsonnet helpers, including
 optional pieces:
@@ -117,18 +139,18 @@ resources: Resources = {
         cfn.allow(cfn.SQS_CONSUME, [cfn.get_att("OrderQueue", "Arn")]),
         cfn.allow(cfn.DDB_WRITE, cfn.arn("dynamodb", f"table/orders-{stage}")),
     ]),
-    "Processor": cfn.function({
-        "FunctionName": f"{service}-{stage}-processor",
-        "Handler": "src/processor.handler",
-        "Runtime": "nodejs20.x",
-        "Role": cfn.get_att("ExecutionRole", "Arn"),
-        "Code": {"S3Bucket": "deploy-artifacts", "S3Key": f"{service}/{stage}/package.zip"},
-        "MemorySize": 256,
-        "Timeout": 30,
-        "Environment": {"Variables": {"STAGE": stage, "TABLE_NAME": f"orders-{stage}"}},
-        "ReservedConcurrentExecutions": 5,
-        "Tags": t,
-    }),
+    "Processor": cfn.function(
+        FunctionName=f"{service}-{stage}-processor",
+        Handler="src/processor.handler",
+        Runtime="nodejs20.x",
+        Role=cfn.get_att("ExecutionRole", "Arn"),
+        Code=cfn.Code(S3Bucket="deploy-artifacts", S3Key=f"{service}/{stage}/package.zip"),
+        MemorySize=256,
+        Timeout=30,
+        Environment=cfn.Environment(Variables={"STAGE": stage, "TABLE_NAME": f"orders-{stage}"}),
+        ReservedConcurrentExecutions=5,
+        Tags=t,
+    ),
     "ProcessorEventSourceMapping": cfn.sqs_event_source("Processor", cfn.get_att("OrderQueue", "Arn")),
     "OrderDLQ": cfn.queue(tags=t),
     "OrderQueue": cfn.queue(
@@ -167,15 +189,15 @@ With `mypy --strict` the example passes cleanly. Introduce two mistakes — a
 misspelled property and a string where CloudFormation wants a number:
 
 ```python
-"MemorySise": 256,     # typo
-"Timeout": "30",       # wrong type
+MemorySise=256,     # typo
+Timeout="30",       # wrong type
 ```
 
 and the checker reports them before any template exists:
 
 ```text
-bad.py:20: error: Extra key "MemorySise" for TypedDict "FunctionProps"  [typeddict-unknown-key]
-bad.py:27: error: Incompatible types (expression has type "str", TypedDict item "Timeout" has type "int")  [typeddict-item]
+bad.py:2: error: Unexpected keyword argument "MemorySise" for "function"; did you mean "MemorySize"?  [call-arg]
+bad.py:2: error: Argument "Timeout" to "function" has incompatible type "str"; expected "int"  [arg-type]
 ```
 
 Editors also autocomplete property names and flag missing required keys as you
