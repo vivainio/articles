@@ -44,21 +44,214 @@ A simplified layout illustrates the division:
 
 The layout chooses where the sidebar goes. The `spaces` mod decides what appears inside it. Native terminal rendering remains the host's responsibility.
 
-Here is the shape of a minimal mod, using the documented API:
+A more useful example is an agent attention panel: filter the live agent
+list, put blocked agents first, and click a row to focus its terminal.
+This illustrative `main.js` uses the APIs documented in Herdr's bundled
+`AGENTS.md` and type declarations:
 
 ```javascript
 import { View, div } from "gpui-kit";
+import { h_flex, v_flex } from "gpui-base";
+import { agents, run, theme } from "herdr";
 
-export default class Greeting extends View {
+const priority = { blocked: 0, done: 1, working: 2, idle: 3 };
+
+export default class AttentionPanel extends View {
+  init() {
+    this.onlyAttention = true;
+  }
+
   render() {
-    return div().child("Hello from a JavaScript mod");
+    const colors = theme();
+    const all = agents();
+    const needsAttention = (a) =>
+      a.status === "blocked" || a.status === "done";
+    const waiting = all.filter(needsAttention).length;
+    const visible = all
+      .filter((a) => !this.onlyAttention || needsAttention(a))
+      .sort((a, b) => priority[a.status] - priority[b.status]);
+
+    const panel = v_flex()
+      .gap(8)
+      .p(12)
+      .child(
+        h_flex()
+          .items_center()
+          .justify_between()
+          .child(`Needs you: ${waiting}`)
+          .child(
+            div()
+              .id("toggle-attention")
+              .px(8)
+              .py(4)
+              .rounded(4)
+              .bg(colors.surface)
+              .child(this.onlyAttention ? "Show all" : "Attention only")
+              .on_click((_event, cx) => {
+                this.onlyAttention = !this.onlyAttention;
+                cx.notify();
+              })
+          )
+      );
+
+    for (const agent of visible) {
+      panel.child(
+        h_flex()
+          .id(`agent-${agent.address}`)
+          .gap(8)
+          .p(8)
+          .rounded(4)
+          .hover((style) => style.bg(colors.surface))
+          .child(div().flex_1().child(
+            `${agent.space_name}: ${agent.title || agent.app || agent.address}`
+          ))
+          .child(agent.status)
+          .on_click(() => run("agent.focus", {
+            terminal: agent.address
+          }))
+      );
+    }
+
+    if (!visible.length) panel.child("No agents in this view.");
+    return panel;
   }
 }
 ```
 
+This combines ordinary JavaScript filtering and sorting with native UI
+composition. `v_flex()` stacks elements; `h_flex()` arranges a row. Chained
+builders set spacing, colors and hover behavior, and stable element IDs
+identify interactive controls.
+
+The filter is instance state on the `View`. Clicking the toggle changes
+that state and calls `cx.notify()` to request a render. Herdr also renders
+mods again when its live data changes, so `agents()` needs no polling loop.
+Clicking an agent invokes `agent.focus` through the host's command API,
+using the same command mechanism as a keybinding.
+
+The snippet illustrates the panel code; installing it also requires a mod
+manifest and a layout block referencing the mod. It has been checked
+against the installed API documentation, but has not been run in Herdr.
+
 There is no browser DOM, HTML or CSS here, and the runtime does not provide Node APIs. The JavaScript describes GPUI elements; Rust draws them. Host APIs supply application data and commands.
 
 Personal layout and mod edits reload while the app runs. Duplicate shipped layouts and mods before changing them, since Herdr maintains the shipped copies. Mods are trusted code with access to capabilities such as running programs, rather than sandboxed extensions. These details are covered in the [mod guide](https://github.com/herdrdev/herdr-app/blob/master/defaults/AGENTS.md).
+
+## How panels communicate
+
+A layout describes composition; the mods inside it implement behavior.
+Mods can coordinate through `shared(key)` and `setShared(key, value)` from
+`herdr`. Every mod can read these values, and changing one causes all mods
+to render again. For example, a toolbar can set a filter that a separate
+agent panel reads:
+
+```javascript
+// In a toolbar's click handler:
+setShared("my-dashboard.attention-only", true);
+
+// In the agent panel's render method:
+const onlyAttention = shared("my-dashboard.attention-only") ?? false;
+```
+
+Each mod imports the functions it uses from `herdr`. Namespacing the key
+keeps unrelated mods from accidentally sharing a setting. This is shared
+application state, rather than a direct call from one layout to another.
+`localStorage` provides a separate persistence mechanism per mod copy.
+
+The host API goes further than drawing. Mods can read live spaces, agents,
+terminals, focus and theme; invoke app commands with `run()`; open other
+mods as dialogs or popups with `openOverlay()` and pass them `props`; and
+post notifications. They can also run programs with `exec()`, access
+terminal operations through `hc()`, read files, watch folders and use
+`fetch()`. Mod commands arrive through `nextCommand()`, allowing a
+keybinding to trigger custom mod behavior. The bundled `herdr.d.ts` and
+[interface guide](https://github.com/herdrdev/herdr-app/blob/master/defaults/AGENTS.md#the-herdr-module)
+describe the available surface.
+
+### Open a dialog and pass context
+
+One mod can open another with explicit props. For example, a panel's
+click handler could open an `agent-details` mod for a selected agent:
+
+```javascript
+import { openOverlay } from "herdr";
+
+// Inside a click handler, where agent is the selected row:
+openOverlay({
+  mod: "agent-details",
+  kind: "dialog",
+  width: 420,
+  height: 180,
+  props: { terminal: agent.address, title: agent.title }
+});
+```
+
+The receiving mod reads those props and can act on the selected terminal:
+
+```javascript
+import { View, div } from "gpui-kit";
+import { v_flex } from "gpui-base";
+import { props, run, closeOverlay } from "herdr";
+
+export default class AgentDetails extends View {
+  render() {
+    const { terminal, title, overlay } = props();
+    return v_flex().gap(12).p(16)
+      .child(title || terminal)
+      .child(
+        div().id("focus-agent").child("Go to agent")
+          .on_click(() => {
+            closeOverlay(overlay);
+            run("agent.focus", { terminal });
+          })
+      );
+  }
+}
+```
+
+Herdr supplies the `overlay` ID so the dialog can close itself. The props
+carry the specific terminal address, so the action targets the selected
+agent even if focus changes. As with the panel example, the receiving mod
+also needs its own manifest.
+
+### Send a keyboard command to a mod
+
+A keybinding can invoke custom mod behavior. Add a binding to the relevant
+section of your existing `keys.json`:
+
+```json
+{
+  "global": {
+    "cmd-shift-j": "attention-panel.toggle"
+  }
+}
+```
+
+Here `attention-panel` is the mod's name and `toggle` is the command it
+receives. To handle it, replace the attention panel's earlier `init()`
+with this version:
+
+```javascript
+// Also import nextCommand from "herdr".
+init(_props, cx) {
+  this.onlyAttention = true;
+  cx.spawn(async (cx) => {
+    for (;;) {
+      const command = await nextCommand();
+      if (command === "toggle") {
+        this.onlyAttention = !this.onlyAttention;
+        cx.notify();
+      }
+    }
+  });
+}
+```
+
+`nextCommand()` waits asynchronously for a command. It does not poll.
+This lets the keyboard and the panel's button change the same view state.
+The mod must be loaded for its command handler to be running. These are
+illustrative API examples, checked against the installed declarations;
+they have not been exercised in the running app.
 
 ## Configure it by giving your agent AGENTS.md
 
