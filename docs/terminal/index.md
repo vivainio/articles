@@ -9,6 +9,9 @@ environment that stays useful while editors, agents, and fashions change.
 
 ## Notes
 
+- [What is Herdr Desktop?](herdr-desktop.md) — native GPUI rendering with
+  a JavaScript mod interface and JSON window layouts.
+
 - [Tmux Tutorial](tmux.md) — a personal, progressively introduced tmux setup.
 - [Herdr Tutorial](herdr.md) — a more visual terminal workspace manager that
   retains the multiplexer model and adds agent awareness.
