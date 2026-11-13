@@ -9,7 +9,7 @@ The steps below are what I did, in order. Each one was checked with a command al
 ## What you need
 
 - Windows 11 with WSL2 and an Ubuntu distribution. I used Ubuntu 24.04.
-- Herdr installed inside WSL. Check with `command -v herdr` and `command -v hc`. The `hc` binary is herdr-core, which the desktop app expects. In my setup `herdr` was 0.9.5 and `hc` was 0.1.21, both in `~/.local/bin`.
+- herdr-core installed inside WSL, which provides the `hc` command. Check with `command -v hc` and `hc --help`. In my setup `hc` was 0.1.21 in `~/.local/bin`. The desktop app starts its own herdr-core in WSL over SSH, so herdr-core must be installed there. An older `herdr` 0.9.5 CLI was also installed. It was a separate server, and the desktop app did not attach to it.
 - Herdr Desktop installed on Windows.
 - Windows OpenSSH client (`ssh` and `ssh-keygen` on the PATH). Windows 11 includes it.
 
@@ -111,11 +111,13 @@ What I could check from the WSL side, after adding the machine in the app:
 
 ```bash
 ss -tnp | grep ':22 '
-herdr session list
+ps -eo pid,lstart,args | grep '[h]erdr-core'
 hc ls
 ```
 
-Two established connections on port 22 meant the desktop app had connected over SSH. `herdr session list` showed the `default` session running. `hc ls` showed no terminals, as expected before any space exists.
+Two established connections on port 22 meant the desktop app had connected over SSH. The process list then showed `herdr-core serve`, `herdr-core connect` and `herdr-core hold` processes that started at the moment the machine was added. Those are the core the app uses. `hc ls` talked to that core and showed no terminals, as expected before any space exists.
+
+Don't use `herdr session list` or `herdr status` to check this. They report the separate 0.9.5 server, which the desktop route does not use.
 
 To confirm the desktop app is really attached, create a space on the `wsl` machine from the app. Then run `hc ls` again. The new terminal should appear there.
 
@@ -124,7 +126,8 @@ To confirm the desktop app is really attached, create a space on the `wsl` machi
 - **Whether a space created in the desktop app appears in `hc ls`.** I checked the SSH connection and the empty core. I did not confirm a space end to end.
 - **The app's exact screens.** I described the Machines and Add machine steps from the app's own guide file. I did not see the screens myself.
 - **Whether the connection survives a WSL restart or a reboot.** The SSH service needs to start again, and the app needs to reconnect.
-- **Whether the desktop app uses the herdr-core inside WSL, or a copy on Windows.** I expected WSL, because the machine is WSL. Check the machine's status in the app.
+- **Whether the `herdr-core` processes belong to the app's own session.** Their start time matched when I added the machine, which is strong evidence but not proof. Confirm by checking that a space's terminals appear in `hc ls`.
+- **The relationship between `hc` and `herdr-core`.** I used `hc` for CLI checks, and the processes are named `herdr-core`. I did not confirm from the binaries whether `hc` is a symlink or a separate program.
 
 ## Security notes
 
