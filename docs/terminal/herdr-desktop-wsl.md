@@ -55,14 +55,16 @@ Set a passphrase when asked. The private key stays on Windows. Only the `.pub` f
 
 ## Step 3: Authorize the public key in WSL
 
-Copy the contents of `herdr_desktop_ed25519.pub` (one line, starting with `ssh-ed25519`) and add it to WSL's `authorized_keys`. Run this in WSL, replacing the placeholder with your key line:
+Run this in WSL. It reads the public key straight from the Windows folder, so there is nothing to copy and paste. Replace `<you>` with your Windows user name:
 
 ```bash
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
-touch ~/.ssh/authorized_keys
-echo 'ssh-ed25519 AAAA...your-key... herdr-desktop' >> ~/.ssh/authorized_keys
+PUB=/mnt/c/Users/<you>/.ssh/herdr_desktop_ed25519.pub
+grep -qxF "$(cat "$PUB")" ~/.ssh/authorized_keys 2>/dev/null || cat "$PUB" >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
 ```
+
+The `grep` check means you can run it again without adding the key twice.
 
 Then test the key from Windows. It asks for the passphrase, not a password:
 
