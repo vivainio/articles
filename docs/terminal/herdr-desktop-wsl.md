@@ -2,22 +2,28 @@
 
 *2026-11-13*
 
-This guide connects the Herdr Desktop app on Windows to herdr-core running inside a WSL2 Linux distribution. The app is a client. The terminals and agents run in the core, so the WSL side needs a running herdr server, and the desktop app needs a way to reach it. Here that way is SSH to `localhost`, which WSL forwards to the Linux side.
+This guide connects the Herdr Desktop app on Windows to herdr-core running inside a WSL2 Linux distribution. The app is a client. The terminals and agents run in the core, so the WSL side needs herdr-core installed, and the desktop app needs a way to reach it. Here that way is SSH to `localhost`, which WSL forwards to the Linux side.
 
 The steps below are what I did, in order. Each one was checked with a command along the way. The last section lists what I could not verify.
 
 ## What you need
 
 - Windows 11 with WSL2 and an Ubuntu distribution. I used Ubuntu 24.04.
-- herdr-core installed inside WSL, which provides the `hc` command. Check with `command -v hc` and `hc --help`. In my setup `hc` was 0.1.21 in `~/.local/bin`. The desktop app starts its own herdr-core in WSL over SSH, so herdr-core must be installed there. An older `herdr` 0.9.5 CLI was also installed. It was a separate server, and the desktop app did not attach to it.
+- herdr-core installed inside WSL, which provides the `hc` command. Install it on Linux with:
+
+  ```sh
+  curl -fsSL https://releases.herdr.dev/core/install.sh | sh
+  ```
+
+  Check it with `command -v hc` and `hc --version`. Update it later with `hc update`. In my setup `hc` was 0.1.21 in `~/.local/bin`. The desktop app starts its own herdr-core in WSL over SSH, so herdr-core must be installed there.
 - Herdr Desktop installed on Windows.
 - Windows OpenSSH client (`ssh` and `ssh-keygen` on the PATH). Windows 11 includes it.
 
 Herdr's Windows beta documentation describes running Herdr natively on Windows. It does not describe attaching the desktop app to a WSL server. The route below is the one I could verify.
 
-## Why not just run herdr in a WSL terminal
+## Why not just use a WSL terminal
 
-Running `herdr` inside a WSL terminal, such as Windows Terminal or WezTerm, starts a session in that terminal. It does not attach the Herdr Desktop window to WSL. The desktop app connects to a machine, and it only lists machines it can reach over SSH. So the desktop route needs an SSH server in WSL.
+Opening a WSL terminal, such as in Windows Terminal or WezTerm, and working with herdr-core there gives you a session in that terminal. It does not attach the Herdr Desktop window to WSL. The desktop app connects to a machine, and it only lists machines it can reach over SSH. So the desktop route needs an SSH server in WSL.
 
 ## Step 1: Install and start the SSH server in WSL
 
@@ -116,9 +122,6 @@ hc ls
 ```
 
 Two established connections on port 22 meant the desktop app had connected over SSH. The process list then showed `herdr-core serve`, `herdr-core connect` and `herdr-core hold` processes that started at the moment the machine was added. Those are the core the app uses. `hc ls` talked to that core and showed no terminals, as expected before any space exists.
-
-Don't use `herdr session list` or `herdr status` to check this. They report the separate 0.9.5 server, which the desktop route does not use.
-
 To confirm the desktop app is really attached, create a space on the `wsl` machine from the app. Then run `hc ls` again. The new terminal should appear there.
 
 ## What I did not verify
