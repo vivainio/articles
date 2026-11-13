@@ -26,6 +26,7 @@ nav = [
     { "Tmux Tutorial" = "terminal/tmux.md" },
     { "Herdr Tutorial" = "terminal/herdr.md" },
     { "What is Herdr Desktop?" = "terminal/herdr-desktop.md" },
+    { "Connecting Herdr Desktop to WSL" = "terminal/herdr-desktop-wsl.md" },
   ] },
   { "Learning Mac" = [
     { "Overview" = "learning-mac/index.md" },
