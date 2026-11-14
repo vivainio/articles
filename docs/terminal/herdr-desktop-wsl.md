@@ -4,7 +4,29 @@
 
 This guide connects the Herdr Desktop app on Windows to herdr-core running inside a WSL2 Linux distribution. The app is a client. The terminals and agents run in the core, so the WSL side needs herdr-core installed, and the desktop app needs a way to reach it. Here that way is SSH to `localhost`, which WSL forwards to the Linux side.
 
-The steps below are what I did, in order. Each one was checked with a command along the way. The last section lists what I could not verify.
+## The short way: `claudelator herdr`
+
+Everything below except the last app step is scripted in [claudelator](https://github.com/vivainio/claudelator). Run it in your own WSL shell, not as root and not inside a sandboxed agent:
+
+```bash
+uv tool install claudelator
+claudelator herdr --dry-run   # preview, changes nothing
+claudelator herdr             # do it
+claudelator herdr check       # sshd, connections, herdr-core processes, hc ls
+```
+
+It installs `hc` and the SSH server if missing, creates the key, authorizes it, adds the `Host wsl` entry to the Windows SSH config, and turns off password login. Each step is skipped when it is already done. Password login is only turned off after a key login to `localhost` succeeds, so a bad key cannot lock you out. You still add the machine in the app yourself (Step 6).
+
+Two differences from the manual steps:
+
+- **The key has no passphrase.** The script runs unattended, so it creates the key without one. That makes the key file as good as a login: anyone who can read it gets a shell as you. To limit that, the script also adds the key's path to `sandbox.filesystem.denyRead` in `~/.claude/settings.json`, so a sandboxed Claude Code cannot read it. If you want a passphrase, follow the manual steps instead.
+- **Lockdown is not optional.** The manual steps treat turning off password login as a step you can postpone. The script always does it, after the key test.
+
+I have only run the script's dry run against a setup that was already working. I have not run it on a fresh WSL.
+
+## The manual way
+
+The manual steps below are what I did, in order. Each one was checked with a command along the way. The last section lists what I could not verify.
 
 ## What you need
 
