@@ -2,6 +2,13 @@
 
 *2026-11-14*
 
+**In short:**
+
+- A GitHub job that only *launches* external E2E tests cannot wait for them, and holding a runner open to poll is wasteful.
+- Instead, finish the first workflow and have the test service send a `repository_dispatch` event when the tests complete. That starts a second workflow, which promotes the release.
+- Identify the release with an immutable manifest in a bucket, and register it before launching the tests.
+- Treat the event as a hint, not proof. Verify the result, the assets, and that this is still the current candidate before promoting, and make promotion idempotent.
+
 A deployment pipeline builds a release, puts its assets in a bucket, deploys them to a test environment, and starts end-to-end tests. The tests run on an external service and take a long time. When they pass, we want to promote the same release to the next environment.
 
 If the action that starts the tests returns immediately, a later job with `needs: e2e` only waits for the launch. It does not wait for the external tests. We can keep a runner alive to poll for the result, but there is another option: finish the first workflow and have the test service start a second one when the result is ready.
