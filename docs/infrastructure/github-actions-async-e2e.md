@@ -99,6 +99,13 @@ On each request, the adapter:
 
 Many organizations block access to GitHub except from approved networks, for example AWS accounts whose egress is already allowed through a firewall or proxy. Run the adapter in one of those accounts, in a VPC whose outbound traffic leaves through the approved path, so it can reach the GitHub API without a new exception. The test service does not need that access, since it only calls the adapter. If the restriction is GitHub's own IP allow list (a GitHub Enterprise Cloud feature), the adapter's fixed egress address must be on that list instead. See [GitHub's IP allow list documentation](https://docs.github.com/en/enterprise-cloud@latest/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/managing-allowed-ip-addresses-for-your-organization). Either way, a leaked App key or installation token is much less useful from outside the approved network.
 
+If the adapter lives in a shared "GitHub Actions central" account that serves many teams, a few things change:
+
+- **Cross-account callers.** Use IAM authentication (a Function URL or API Gateway with IAM auth) and a resource policy that names the calling accounts or roles, instead of a shared secret. Workflow A can register releases the same way, with credentials from GitHub OIDC.
+- **Registry in the central account.** Keep the release records next to the adapter, so it does not need cross-account reads to verify a callback. Record the target repository and the registering caller with each release.
+- **Per-repository authorization.** Derive the destination repository from the release record, never from the request, and check that the caller is allowed to act for it. Otherwise one team's test service could trigger another team's promotion. Request the installation token for that single repository.
+- **One App, many installations.** Install the GitHub App on each repository it serves, and keep the key in the central account only.
+
 Because the adapter builds the payload itself, the test runner cannot forge the result or the manifest. The adapter is now the trust boundary, so give its role only what it needs: read the key, read the release record, and call the test service. The receiving workflow must still verify the result before promoting, as described below; the adapter lowers the risk of forged events but does not replace that check.
 
 ## Receive the event and deploy
