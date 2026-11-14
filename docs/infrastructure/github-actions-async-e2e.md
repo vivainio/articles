@@ -197,7 +197,23 @@ For example, `current-candidate.json` might contain:
 
 The pipeline updates the pointer when a release becomes a candidate. After verifying an E2E result, the continuation reads the pointer and compares it with the release being promoted. If they differ, it skips the promotion. A database or deployment service could hold the same record instead of the bucket.
 
-The pointer needs an ordering policy: concurrent builds must not let an older release overwrite a newer candidate. Conditional updates can help enforce that policy. A read followed by a deployment is also not atomic: a new candidate could be registered between the check and the deployment. If an outdated candidate must never deploy after that point, candidate registration and promotion need a shared coordination protocol, such as a deployment controller that atomically checks and claims the candidate. GitHub Actions concurrency can serialize deployment jobs, but it does not by itself coordinate candidate updates or determine release order.
+The pointer needs an ordering policy: concurrent builds must not let an older release overwrite a newer candidate. Conditional updates can help enforce that policy. A read followed by a deployment is also not atomic: a new candidate could be registered between the check and the deployment. If an outdated candidate must never deploy after that point, candidate registration and promotion need a shared coordination protocol, such as a deployment controller that atomically checks and claims the candidate (the [coordinator](#a-small-ci-coordinator) described below). GitHub Actions concurrency can serialize deployment jobs, but it does not by itself coordinate candidate updates or determine release order.
+
+## A small CI coordinator
+
+Several pieces above share state and must agree with each other: the release record, the dispatch adapter, the current-candidate pointer, and the promotion record. Together they form a small *CI coordinator*, a service that GitHub workflows ask whether a release may proceed. It does not build or deploy anything; GitHub Actions still does that.
+
+The responsibilities this article needs are:
+
+- **Release registry.** Bind the manifest, the GitHub run, and the E2E correlation ID before the tests are launched.
+- **Result intake.** Authenticate the test service, fetch the real result, and send the dispatch event (the adapter described earlier).
+- **Candidate policy.** Decide which release is current, and whether an older passing release may still be promoted.
+- **Promotion claim.** Atomically record one promotion per release and destination, so duplicate and late callbacks are harmless.
+- **Timeouts.** Notice test runs that never report back.
+
+A small implementation is a Lambda function plus one table. Conditional writes on the table provide the atomic candidate check and promotion claim. The candidate and promotion claims can be added after the registry and result intake work.
+
+What else the coordinator should own is an open design question. Other actions, such as starting the E2E run itself, triggering rollbacks, notifying people, or dispatching other workflows, could live here too. Add one only when it needs the same shared state or the same trust boundary as the responsibilities above. Otherwise leave it in the workflow, where it is easier to see and change.
 
 ## Required pull request checks
 
