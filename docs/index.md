@@ -42,6 +42,9 @@ keys, starting with modifiers, shortcuts, and Spotlight.](learning-mac/index.md)
 Small systems, packaging techniques, and practical ways to get software into
 people's hands.](building/index.md)
 
+[:lucide-git-branch: **GitHub Actions** — patterns and research for workflows
+that build, test, and deploy software.](github-actions/index.md)
+
 [:lucide-cloud-cog: **Infrastructure experiments**  
 Attempts to make cloud infrastructure smaller, clearer, and easier to
 understand.](infrastructure/index.md)

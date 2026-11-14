@@ -38,6 +38,10 @@ nav = [
     { "Packaging Rust Apps to PyPI" = "building/packaging-rust-to-pypi.md" },
     { "Python Standard Library Web Server" = "building/python-stdlib-webserver/index.md" },
   ] },
+  { "GitHub Actions" = [
+    { "Overview" = "github-actions/index.md" },
+    { "Continuing a Deployment After E2E Tests" = "infrastructure/github-actions-async-e2e.md" },
+  ] },
   { "Languages & runtimes" = [
     { "Overview" = "languages/index.md" },
     { "Which Lua?" = "languages/which-lua.md" },
@@ -54,7 +58,6 @@ nav = [
   ] },
   { "Infrastructure experiments" = [
     { "Overview" = "infrastructure/index.md" },
-    { "Continuing a Deployment After E2E Tests" = "infrastructure/github-actions-async-e2e.md" },
     { "Ejecting Serverless with Jsonnet" = "infrastructure/jsonnet-cloudformation/index.md" },
     { "CloudFormation with Python TypedDicts" = "infrastructure/python-typeddict-cloudformation/index.md" },
     { "Document Pipeline: Durable Functions" = "infrastructure/document-pipeline-durable-functions.md" },

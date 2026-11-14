@@ -9,9 +9,6 @@ ones can be removed without giving up the useful parts.
 
 ## Notes
 
-- [Continuing a Deployment After Long-Running E2E Tests](github-actions-async-e2e.md) —
-  using a repository dispatch and a bucket manifest to promote the release
-  that passed external tests.
 - [Ejecting Serverless with Jsonnet](jsonnet-cloudformation/index.md) —
   replacing framework-generated CloudFormation with a small Jsonnet library
   and templates you can inspect directly.
