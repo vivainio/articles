@@ -54,6 +54,7 @@ nav = [
   ] },
   { "Infrastructure experiments" = [
     { "Overview" = "infrastructure/index.md" },
+    { "Continuing a Deployment After E2E Tests" = "infrastructure/github-actions-async-e2e.md" },
     { "Ejecting Serverless with Jsonnet" = "infrastructure/jsonnet-cloudformation/index.md" },
     { "CloudFormation with Python TypedDicts" = "infrastructure/python-typeddict-cloudformation/index.md" },
     { "Document Pipeline: Durable Functions" = "infrastructure/document-pipeline-durable-functions.md" },

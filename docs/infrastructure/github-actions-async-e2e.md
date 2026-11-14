@@ -1,0 +1,129 @@
+# Continuing a GitHub Actions Deployment After Long-Running E2E Tests
+
+*2026-11-14*
+
+A deployment pipeline builds a release, puts its assets in a bucket, deploys them to a test environment, and starts end-to-end tests. The tests run on an external service and take a long time. When they pass, we want to promote the same release to the next environment.
+
+If the action that starts the tests returns immediately, a later job with `needs: e2e` only waits for the launch. It does not wait for the external tests. We can keep a runner alive to poll for the result, but there is another option: finish the first workflow and have the test service start a second one when the result is ready.
+
+```text
+GitHub workflow A          E2E service             GitHub workflow B
+  build and upload              |                        |
+  deploy to test                |                        |
+  start tests ----------------->|                        |
+  finish                        | run tests              |
+                                | report result -------->|
+                                |                        | verify and promote
+```
+
+The handoff uses GitHub's [`repository_dispatch` event](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#repository_dispatch). The second workflow is a new run, not a resumed job in the first one. In particular, a successful first run means the tests were *started*, not that they passed.
+
+## A manifest identifies the release
+
+The build already writes a manifest to the bucket. It can describe the release without copying the assets into GitHub Actions artifacts:
+
+```json
+{
+  "release_id": "123456789-1",
+  "commit_sha": "abc123...",
+  "origin_run_id": "123456789",
+  "origin_run_attempt": "1",
+  "assets": [
+    {
+      "uri": "s3://example-builds/releases/123456789-1/app.tar.gz",
+      "sha256": "..."
+    }
+  ]
+}
+```
+
+Here the bucket and names are examples; the pattern works with other object stores. Use a unique location for each build and make the manifest and its assets immutable, or record exact object versions and checksums and verify them when reading. A handle to `latest/manifest.json` is not enough: it could refer to a different release by the time the tests finish.
+
+Before starting E2E, workflow A uploads the manifest, deploys its assets to the test environment, and registers a release record that binds the manifest handle to the GitHub run and the E2E request. The record can live in a database or in the test service if it supports the necessary lookup. It gives the continuation a trusted way to check what the callback refers to.
+
+Pass the manifest handle and a unique correlation ID when starting the tests. If the service returns its own test run ID, record that too. Make the manifest and correlation record available before a completion callback can arrive; a very fast test must not race ahead of registration. For example, preassign the correlation ID and register it before the launch request, then have the callback carry it along with the service's test run ID.
+
+## Send a completion event
+
+When the tests finish, the service or a trusted callback adapter sends the result to GitHub:
+
+```bash
+curl --fail-with-body --request POST \
+  "https://api.github.com/repos/OWNER/REPO/dispatches" \
+  --header "Accept: application/vnd.github+json" \
+  --header "Authorization: Bearer $GITHUB_DISPATCH_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "event_type": "e2e_completed",
+    "client_payload": {
+      "result": "passed",
+      "manifest_uri": "s3://example-builds/releases/123456789-1/manifest.json",
+      "correlation_id": "123456789-1",
+      "test_run_id": "e2e-98765",
+      "origin_run_id": "123456789"
+    }
+  }'
+```
+
+The values are examples; the sender substitutes the values from the actual run. GitHub returns HTTP 204 when it accepts the event. That is not confirmation that deployment succeeded. See [Create a repository dispatch event](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event).
+
+The sender needs a credential authorized for the repository. A GitHub App installation token is one option; GitHub specifies **Contents: write** for a fine-grained token used with this endpoint. The original job's `GITHUB_TOKEN` expires when that job finishes, so it cannot be saved for a callback that happens later. See [GitHub's token lifetime documentation](https://docs.github.com/en/actions/concepts/security/github_token).
+
+## Receive the event and deploy
+
+The receiving workflow must exist on the repository's default branch. For example, `.github/workflows/deploy-after-e2e.yml` could contain:
+
+```yaml
+name: Deploy after E2E
+
+on:
+  repository_dispatch:
+    types: [e2e_completed]
+
+permissions:
+  contents: read
+  # Add id-token: write if cloud authentication uses GitHub OIDC.
+
+jobs:
+  promote:
+    if: ${{ github.event.client_payload.result == 'passed' }}
+    runs-on: ubuntu-latest
+    environment: next-stage
+
+    steps:
+      # The deployment scripts come from the default branch.
+      - uses: actions/checkout@v4
+
+      # Authenticate to the object store and deployment platform here.
+
+      - name: Verify and promote
+        env:
+          MANIFEST_URI: ${{ github.event.client_payload.manifest_uri }}
+          CORRELATION_ID: ${{ github.event.client_payload.correlation_id }}
+          TEST_RUN_ID: ${{ github.event.client_payload.test_run_id }}
+          ORIGIN_RUN_ID: ${{ github.event.client_payload.origin_run_id }}
+        run: |
+          ./scripts/verify-e2e-result.sh
+          ./scripts/promote-assets.sh --environment next-stage
+```
+
+The scripts are placeholders for your infrastructure, not built-in GitHub commands. The first should fetch and validate the manifest and test result; the second should promote the exact assets described by that validated manifest. Pass event values through environment variables rather than inserting them directly into shell source.
+
+`repository_dispatch` runs in the default-branch context. In this example the deployment scripts come from that branch, while the release to promote is identified by the manifest. If the deployment process needs code from the tested commit, obtain its SHA from the validated manifest and explicitly check it out separately; take care when running code from a release with deployment credentials. GitHub documents the event's branch and payload behavior in its [workflow events reference](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#repository_dispatch).
+
+The `next-stage` environment can hold stage-specific secrets and protection rules. With no required approval rule, the job can proceed automatically; a required reviewer introduces a manual wait. See [managing environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
+
+## Make the handoff reliable
+
+The `result == 'passed'` condition is a useful filter, not a complete deployment gate. Before promoting, the implementation needs to establish that this is the right result for the right release:
+
+- **Verify the result.** Look up the test run in the E2E service or a trusted result record. Check that it passed and matches the registered correlation ID, manifest, original run, and tested deployment. Check that the manifest URI is in an allowed bucket and prefix before fetching it.
+- **Verify the assets.** Read the immutable manifest version and verify the referenced object versions or checksums. Ensure the assets promoted are the assets the test environment actually used.
+- **Handle duplicate and late callbacks.** Persist a promotion record keyed by release and destination, and make the promotion operation idempotent. Tests for an older release can finish after a newer release has already been promoted; enforce your policy for whether the older result may still deploy.
+- **Handle missing and failed results.** Record failures and monitor test runs that never report back. Retry transient dispatch failures, and make retries safe. An accepted dispatch is only the start of the second workflow; monitor its result too.
+
+Be careful with parallel releases sharing a test environment: if a newer deployment replaces the assets while an older test run is still executing, the old run may not have tested the release named in its manifest. Isolated test environments or explicit coordination can bind each test run to the deployment it actually exercises.
+
+If E2E must be a required pull request check, the first workflow's success is insufficient because it finishes at launch. A separate check or commit status needs to remain pending until the external result is known.
+
+The bucket manifest keeps the release description with the assets. The dispatch event carries a small handle and a test identity; the continuation retrieves the release and verifies that the reported test result authorizes promotion.
