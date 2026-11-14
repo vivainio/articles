@@ -79,7 +79,25 @@ curl --fail-with-body --request POST \
 
 The values are examples; the sender fills in the values from the actual run. GitHub returns HTTP 204 when it accepts the event. That is not confirmation that deployment succeeded. See [Create a repository dispatch event](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event).
 
-The sender needs a credential authorized for the repository. A GitHub App installation token is one option; GitHub specifies **Contents: write** for a fine-grained token used with this endpoint. The original job's `GITHUB_TOKEN` expires when that job finishes, so it cannot be saved for a callback that happens later. See [GitHub's token lifetime documentation](https://docs.github.com/en/actions/concepts/security/github_token).
+The sender needs a credential authorized for the repository (see [Who sends the dispatch](#who-sends-the-dispatch)). A GitHub App installation token is one option; GitHub specifies **Contents: write** for a fine-grained token used with this endpoint. The original job's `GITHUB_TOKEN` expires when that job finishes, so it cannot be saved for a callback that happens later. See [GitHub's token lifetime documentation](https://docs.github.com/en/actions/concepts/security/github_token).
+
+## Who sends the dispatch
+
+Avoid giving the dispatch credential to the test runner. Anyone holding it can send `e2e_completed` with any payload, including `"result": "passed"`, and test runners often execute code from the release under test. Put the credential in a small trusted adapter instead, for example a Lambda function behind a Function URL. The E2E service calls the adapter, and the adapter calls GitHub.
+
+Setup:
+
+- Create a GitHub App with only **Contents: write** and install it on this one repository.
+- Store the App's private key in a secrets manager, readable only by the adapter's role. The App ID and installation ID are not secret.
+
+On each request, the adapter:
+
+1. **Authenticates the caller**, for example by checking the E2E service's webhook signature or a shared secret. It rejects anything else.
+2. **Fetches the facts instead of trusting the body.** It takes the test run ID from the request, reads the result from the E2E service's API, and looks up the release record by correlation ID to get the manifest URI and origin run.
+3. **Mints a short-lived token.** It signs a JWT with the App key and exchanges it at `POST /app/installations/{installation_id}/access_tokens`, requesting only `contents: write` on this repository. See [GitHub's installation token documentation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation).
+4. **Sends the dispatch** with a payload built from the verified data, not copied from the request.
+
+Because the adapter builds the payload itself, the test runner cannot forge the result or the manifest. The adapter is now the trust boundary, so give its role only what it needs: read the key, read the release record, and call the test service. The receiving workflow must still verify the result before promoting, as described below; the adapter lowers the risk of forged events but does not replace that check.
 
 ## Receive the event and deploy
 
