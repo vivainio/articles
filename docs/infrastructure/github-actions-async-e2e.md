@@ -56,13 +56,13 @@ Pass the manifest handle and a unique correlation ID when starting the tests. If
 
 ## Send a completion event
 
-When the tests finish, the service or a trusted callback adapter sends the result to GitHub:
+When the tests finish, a trusted adapter (see [Who sends the dispatch](#who-sends-the-dispatch)) sends the result to GitHub. The request looks like this; the test service itself does not make it:
 
 ```bash
 curl --fail-with-body --request POST \
   "https://api.github.com/repos/OWNER/REPO/dispatches" \
   --header "Accept: application/vnd.github+json" \
-  --header "Authorization: Bearer $GITHUB_DISPATCH_TOKEN" \
+  --header "Authorization: Bearer $INSTALLATION_TOKEN" \
   --header "Content-Type: application/json" \
   --data '{
     "event_type": "e2e_completed",
@@ -77,9 +77,9 @@ curl --fail-with-body --request POST \
   }'
 ```
 
-The values are examples; the sender fills in the values from the actual run. GitHub returns HTTP 204 when it accepts the event. That is not confirmation that deployment succeeded. See [Create a repository dispatch event](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event).
+The values are examples; the adapter fills them in from the verified run, not from the test service's request. GitHub returns HTTP 204 when it accepts the event. That is not confirmation that deployment succeeded. See [Create a repository dispatch event](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event).
 
-The sender needs a credential authorized for the repository (see [Who sends the dispatch](#who-sends-the-dispatch)). A GitHub App installation token is one option; GitHub specifies **Contents: write** for a fine-grained token used with this endpoint. The original job's `GITHUB_TOKEN` expires when that job finishes, so it cannot be saved for a callback that happens later. See [GitHub's token lifetime documentation](https://docs.github.com/en/actions/concepts/security/github_token).
+The adapter needs a credential authorized for the repository. A GitHub App installation token, minted per request, is the recommended option; GitHub specifies **Contents: write** for a fine-grained token used with this endpoint. The original job's `GITHUB_TOKEN` expires when that job finishes, so it cannot be saved for a callback that happens later. See [GitHub's token lifetime documentation](https://docs.github.com/en/actions/concepts/security/github_token).
 
 ## Who sends the dispatch
 
